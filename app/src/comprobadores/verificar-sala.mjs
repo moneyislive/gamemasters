@@ -4944,12 +4944,101 @@ paso('El Burgo en la app: el aviso de «poniéndose al día» sigue la regla de 
   );
 }
 
+paso('La noche de El Quiebro carga con barra y sin plazo: ningún reloj la tira al plano, a los 3 minutos se avisa');
+{
+  /*
+   * ═══ EL FALLO DEL 27-SEP, Y LO QUE LO CIERRA ═══
+   *
+   * En el teléfono de Miguel, con datos móviles: «aparece el menú del Quiebro pero se cierra y dice: […] no
+   * se ha puesto en marcha en 25 s». La app esperaba el `listo` del documento 25 s y caía al plano; el
+   * documento lo decía con 2,5 MB ya bajados. Pidió: una barra de carga, que la app no corte a un tiempo
+   * fijo, y a los 3 minutos un mensaje. Aquí se vigila el lado de la app (el del documento, su guion de
+   * arranque y la cola, lo corre `verify:quiebro-juego`; los dos lectores y la carga pura, `verify:liza-protocolo`):
+   *
+   *   · en la pantalla no hay NINGÚN temporizador que no sea el del aviso, y ése sólo despacha `tardanza`;
+   *   · el aviso es de tres minutos, se rearma con cada «seguir esperando» y ofrece las tres salidas;
+   *   · la barra se quita con `jugable`, no con `listo` (el `listo` ya sale al leer la página);
+   *   · el WebView cuenta la página (`onLoadProgress`).
+   */
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+  const escena = leer(path.join(SRC, 'arcade', 'quiebro-en-tres-escena.tsx'));
+  const puente = leer(path.join(SRC, 'arcade', 'quiebro-puente.ts'));
+  const barra = leer(path.join(SRC, 'arcade', 'quiebro-carga.tsx'));
+  const nativo = leer(path.join(SRC, 'arcade', 'quiebro-documento.tsx'));
+
+  const AVISO = "const reloj = setTimeout(() => despachar({ t: 'tardanza' }), AVISO_DE_TARDANZA_MS);";
+  regla(
+    'la pantalla del Quiebro no tiene ningún corte por tiempo: su único temporizador es el del aviso, que sólo despacha `tardanza`',
+    (t) => {
+      const c = soloCodigo(t);
+      const relojes = c.match(/\bsetTimeout\(|\bsetInterval\(/g) ?? [];
+      return relojes.length === 1 && c.includes(AVISO) && !/ESPERA_DEL_DOCUMENTO/.test(c);
+    },
+    escena,
+    [
+      escena.replace(
+        AVISO,
+        `${AVISO}\n    const corte = setTimeout(() => { if (!listo.current) ponerCayo('el documento de la noche no se ha puesto en marcha en 25 s'); }, 25_000);`,
+      ),
+      escena.replace(AVISO, "const reloj = setTimeout(() => ponerCayo('tarda demasiado'), AVISO_DE_TARDANZA_MS);"),
+      escena.replace(AVISO, "const reloj = setTimeout(() => despachar({ t: 'tardanza' }), ESPERA_DEL_DOCUMENTO_MS);"),
+    ],
+    'un reloj que tira al plano es el fallo del 27-sep: el menú aparecía justo cuando la app cortaba',
+  );
+  regla(
+    'el aviso es a los tres minutos y se vuelve a armar tras cada «seguir esperando»',
+    (t) => /export const AVISO_DE_TARDANZA_MS = 180_000;/.test(soloCodigo(t.puente)) && /\}, \[direccion, jugando, intento, esperas, yaJugable\]\);/.test(soloCodigo(t.escena)),
+    { puente, escena },
+    [
+      { puente: puente.replace('export const AVISO_DE_TARDANZA_MS = 180_000;', 'export const AVISO_DE_TARDANZA_MS = 25_000;'), escena },
+      { puente, escena: escena.replace('}, [direccion, jugando, intento, esperas, yaJugable]);', '}, [direccion, jugando, intento, yaJugable]);') },
+    ],
+    'con otro plazo no es lo que pidió Miguel; sin `esperas`, tras «seguir esperando» ya no avisa nunca más',
+  );
+  const SALIDAS = ['rotulo="Seguir esperando"', 'rotulo="Reintentar"', 'rotulo="Jugar sobre el plano"'];
+  regla(
+    'el aviso dice por qué (la razón probable) y ofrece seguir esperando, reintentar y jugar sobre el plano',
+    (t) => {
+      const c = soloCodigo(t);
+      return SALIDAS.every((s) => c.includes(s)) && /\{razonProbable\(carga\)\}/.test(c) && /'Está tardando más de lo normal…'/.test(c);
+    },
+    barra,
+    [barra.replace(' rotulo="Seguir esperando"', ' rotulo="Vale"'), barra.replace(' rotulo="Jugar sobre el plano"', ' rotulo="Salir"'), barra.replace('{razonProbable(carga)}', '{null}')],
+    'sin una de las tres salidas, o sin la razón, el aviso vuelve a ser esperar a ciegas',
+  );
+  regla(
+    'la barra tapa el documento hasta `jugable`, y el WebView le cuenta la página',
+    (t) => /\{carga\.jugable \? null : \(\s*<LaCargaDeLaNoche/.test(soloCodigo(t.escena)) && /onLoadProgress=\{\(e\) => alProgresarLaPagina\(e\.nativeEvent\.progress\)\}/.test(soloCodigo(t.nativo)),
+    { escena, nativo },
+    [
+      { escena: escena.replace('{carga.jugable ? null : (', '{carga.listo ? null : ('), nativo },
+      { escena, nativo: nativo.replace('onLoadProgress={(e) => alProgresarLaPagina(e.nativeEvent.progress)}', '') },
+    ],
+    'quitarla con `listo` es quitarla al leer la página, con el juego aún por bajar; sin `onLoadProgress` el primer tramo no se mueve',
+  );
+}
+
 /*
  * Y once más de lo común de la app: la tarjeta apretada sin «…», la tarjeta que cede ante el turno
  * que pinta el juego, «Tirar mesa» y «Golpe» entero en 360. El guardia sube con ellas. Y cuatro
- * de la barra compacta en un renglón (de pie por debajo de 600, y tumbado).
+ * de la barra compacta en un renglón (de pie por debajo de 600, y tumbado). Y catorce de la noche de
+ * El Quiebro que carga sin plazo (27-sep).
  */
-const COMPROBACIONES_ESCRITAS = 419;
+const COMPROBACIONES_ESCRITAS = 433;
 
 if (fallos.length > 0) {
   console.error(`\n✘ ${fallos.length} de ${cuantas} comprobaciones han fallado:\n`);

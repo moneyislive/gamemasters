@@ -19,10 +19,14 @@
  *     vez de seguir hablando la vieja con un documento que ya no la entiende.
  *
  * El lector de abajo es el del contrato renglón a renglón. Las FORMAS las vigila `tsc`; que los dos
- * lectores digan lo mismo ante lo mismo se comprobó al escribirlo, dándoles las mismas muestras buenas y
- * envenenadas, y no hay todavía un comprobador de la batería que lo repita: el sitio natural es
- * `verify:liza-protocolo`, que ya prueba el del contrato. El día que el contrato viva en `shared/` —o
- * Metro vigile `escritorio/src/quiebro/`—, esto se reduce a importar el suyo y la duda desaparece.
+ * lectores digan lo mismo ante lo mismo lo repite `verify:liza-protocolo` (desde el 27-sep), que les da a
+ * los dos las mismas muestras buenas y envenenadas —las de `carga`, `jugable` y `fallo` incluidas—. El día
+ * que el contrato viva en `shared/` —o Metro vigile `escritorio/src/quiebro/`—, esto se reduce a importar
+ * el suyo.
+ *
+ * Aquí vive también, pura, la CARGA DE LA NOCHE tal como la ve la app (`cargaTras`, `razonProbable`): la
+ * barra de la pantalla y el aviso de los tres minutos, sin plazo que tire al plano (ver
+ * `AVISO_DE_TARDANZA_MS`).
  *
  * ═══ LO QUE LA APP MANDA, Y LO QUE NO SE DEJA MANDAR ═══
  *
@@ -35,6 +39,7 @@
  *     las claves, y una opción que el servidor mandara con una de más dejaría la mesa entera sin leer.
  */
 import type {
+  EtapaDeLaCarga,
   MensajeDelDocumento,
   MesaParaElDocumento,
   Movido,
@@ -44,22 +49,44 @@ import type { LaMesa, OpcionDeMesa } from './mesa';
 /** La versión y el tope del puente, ATADOS al contrato: ver la cabecera. */
 type VersionDelContrato = typeof import('../../../escritorio/src/quiebro/contrato').VERSION_DEL_PUENTE;
 type TopeDelContrato = typeof import('../../../escritorio/src/quiebro/contrato').TOPE_DEL_PUENTE;
+type TopeDeLoQueCarga = typeof import('../../../escritorio/src/quiebro/contrato').TOPE_DE_LO_QUE_CARGA;
+type TopeDelFallo = typeof import('../../../escritorio/src/quiebro/contrato').TOPE_DEL_FALLO;
 export const VERSION_DEL_PUENTE: VersionDelContrato = 1;
 export const TOPE_DEL_PUENTE: TopeDelContrato = 1048576;
+export const TOPE_DE_LO_QUE_CARGA: TopeDeLoQueCarga = 80;
+export const TOPE_DEL_FALLO: TopeDelFallo = 300;
+
+/** Las etapas de la carga, copiadas del contrato; `tsc` exige que sean exactamente las suyas (ver abajo). */
+export const ETAPAS_DE_LA_CARGA = ['pagina', 'codigo', 'mesa', 'ciudad', 'personajes', 'graficos'] as const;
+type EtapaDeAqui = (typeof ETAPAS_DE_LA_CARGA)[number];
+/* Si el contrato añade o quita una etapa, una de estas dos líneas deja de compilar. */
+const _todasLasDelContrato: readonly EtapaDeAqui[] = [] as EtapaDeLaCarga[];
+const _todasLasDeAqui: readonly EtapaDeLaCarga[] = [] as EtapaDeAqui[];
+void _todasLasDelContrato;
+void _todasLasDeAqui;
 
 /**
- * Cuánto se espera a que el documento diga `listo`. Lo dice al arrancar su código, antes de bajar la
- * ciudad y los personajes, así que no es la carga entera; pero en la primera noche de un teléfono con
- * mala cobertura el propio código ya son unos megas.
+ * ═══ SIN PLAZO: A LOS TRES MINUTOS SE DICE, Y NADA MÁS ═══
+ *
+ * Hasta el 27-sep la app esperaba el `listo` 25 s y, si no llegaba, caía al plano del barrio. El documento
+ * lo decía con su paquete entero (≈2,5 MB) ya bajado y arrancado, y en el teléfono de Miguel, con datos
+ * móviles, el menú salía justo cuando la app cortaba: «aparece el menú del Quiebro pero se cierra». Ahora
+ * el documento dice `listo` desde su guion de arranque, cuenta su carga (`carga`) y avisa al poder jugar
+ * (`jugable`); y la app NO CORTA POR TIEMPO. Quien juega ve la barra avanzar y espera lo que haga falta. A
+ * los `AVISO_DE_TARDANZA_MS` sin poder jugar la pantalla lo dice, con la razón probable, y ofrece seguir
+ * esperando, reintentar o jugar sobre el plano. Caer sin preguntar queda para los fallos de verdad: la
+ * página que no carga, el servidor que contesta un error, el motor del navegador que se cierra o un puente
+ * de otra versión.
  */
-export const ESPERA_DEL_DOCUMENTO_MS = 25_000;
+export const AVISO_DE_TARDANZA_MS = 180_000;
 
 /**
  * EL NOMBRE DE LA FUNCIÓN QUE EL DOCUMENTO DEJA PARA SU ANFITRIÓN NATIVO. En el WebView los mensajes de
  * la app no llegan por `message` de otra ventana: la app los mete con `injectJavaScript` llamando a esta
- * función, que el documento (`escritorio/src/quiebro/documento.tsx`) deja en `window`. Si allí cambia,
- * cambia aquí; hasta entonces el documento se quedaría esperando la mesa, y la espera de la pantalla lo
- * mandaría al plano del barrio con su nota.
+ * función, que el documento deja en `window` desde el guion de arranque de `escritorio/quiebro.html` (una
+ * cola, hasta que el paquete monta; luego la suya, en `documento.tsx`). Si allí cambia, cambia aquí; hasta
+ * entonces el documento se quedaría esperando la mesa, y la barra se pararía en «la mesa» con el aviso de
+ * los tres minutos.
  */
 export const DONDE_ESCUCHA = 'quiebroDelAnfitrion';
 
@@ -178,7 +205,20 @@ export function leerLoQueDiceElDocumento(dato: unknown): MensajeDelDocumento | n
     if (v.v !== VERSION_DEL_PUENTE) return null;
     if (v.t === 'listo') return { t: 'listo', v: v.v };
     if (v.t === 'salir') return { t: 'salir', v: v.v };
+    if (v.t === 'jugable') return { t: 'jugable', v: v.v };
     return null;
+  }
+  if (conClaves(v, ['t', 'v', 'fraccion', 'etapa', 'que'])) {
+    if (v.t !== 'carga' || v.v !== VERSION_DEL_PUENTE) return null;
+    if (typeof v.fraccion !== 'number' || !Number.isFinite(v.fraccion) || v.fraccion < 0 || v.fraccion > 1) return null;
+    if (typeof v.etapa !== 'string' || !(ETAPAS_DE_LA_CARGA as readonly string[]).includes(v.etapa)) return null;
+    if (typeof v.que !== 'string' || v.que.length < 1 || v.que.length > TOPE_DE_LO_QUE_CARGA) return null;
+    return { t: 'carga', v: v.v, fraccion: v.fraccion, etapa: v.etapa as EtapaDeLaCarga, que: v.que };
+  }
+  if (conClaves(v, ['t', 'v', 'motivo'])) {
+    if (v.t !== 'fallo' || v.v !== VERSION_DEL_PUENTE) return null;
+    if (typeof v.motivo !== 'string' || v.motivo.length < 1 || v.motivo.length > TOPE_DEL_FALLO) return null;
+    return { t: 'fallo', v: v.v, motivo: v.motivo };
   }
   if (conClaves(v, ['t', 'v', 'id', 'movimiento'])) {
     if (v.t !== 'mover' || v.v !== VERSION_DEL_PUENTE || !entero(v.id, 1, Number.MAX_SAFE_INTEGER)) return null;
@@ -196,4 +236,137 @@ export function leerLoQueDiceElDocumento(dato: unknown): MensajeDelDocumento | n
     return { t: 'medida', v: v.v, calidad: v.calidad, nivel: v.nivel };
   }
   return null;
+}
+
+/** Los tipos que el documento manda: un mensaje con uno de ellos y OTRA versión es un puente que no casa. */
+const TIPOS_DEL_DOCUMENTO: readonly string[] = ['listo', 'salir', 'jugable', 'carga', 'fallo', 'mover', 'medida'];
+
+/**
+ * ¿HABLA EL DOCUMENTO OTRA VERSIÓN DEL PUENTE? Su versión si un mensaje suyo —uno de sus tipos, con `v`
+ * entero— trae una que no es la de la app; `null` en cualquier otro caso. Es un fallo de verdad: no se
+ * entenderían, y esperar no lo arregla. La pantalla cae al plano con esta razón.
+ */
+export function versionAjenaDelDocumento(dato: unknown): number | null {
+  if (typeof dato !== 'string' || dato.length > TOPE_DEL_PUENTE) return null;
+  let v: unknown;
+  try {
+    v = JSON.parse(dato) as unknown;
+  } catch {
+    return null;
+  }
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
+  const r = v as Record<string, unknown>;
+  if (typeof r.t !== 'string' || !TIPOS_DEL_DOCUMENTO.includes(r.t)) return null;
+  if (typeof r.v !== 'number' || !Number.isInteger(r.v) || r.v === VERSION_DEL_PUENTE) return null;
+  return r.v;
+}
+
+/* ═══════════════════════════════ LA CARGA DE LA NOCHE, COMO LA VE LA APP ═══════════════════════════════ */
+
+/**
+ * Lo que la barra de la app sabe de la carga del documento. Lo cambia `cargaTras` con cada suceso; la
+ * pantalla lo pinta. Sin reloj dentro: el aviso de los tres minutos es un suceso (`tardanza`) que la
+ * pantalla manda con su temporizador, y aquí no hay NINGÚN camino que lleve al plano del barrio.
+ */
+export interface CargaDeLaNoche {
+  /** De 0 a 1, nunca hacia atrás. */
+  readonly fraccion: number;
+  readonly etapa: EtapaDeLaCarga;
+  /** La línea de qué se está cargando, como la dice el documento. */
+  readonly que: string;
+  /**
+   * El documento cuenta su carga (manda `carga`). Uno que dice `listo` sin haber contado nada es de antes
+   * del 27-sep: lo dice con su código ya arrancado, y la barra se quita con ese `listo`.
+   */
+  readonly cuenta: boolean;
+  readonly listo: boolean;
+  /** Ya se puede jugar: la barra se quita. */
+  readonly jugable: boolean;
+  /** El último fallo de arranque que dijo el documento. */
+  readonly fallo: string | null;
+  /** El aviso a la vista: por los tres minutos o por un fallo; `null` mientras se espera tranquilo. */
+  readonly aviso: 'tardanza' | 'fallo' | null;
+  /** Cuántas veces se eligió seguir esperando: con cada una se vuelven a contar tres minutos. */
+  readonly esperas: number;
+}
+
+export type SucesoDeLaCarga =
+  /** Lo que el WebView dice de la página (`onLoadProgress`), de 0 a 1. */
+  | { readonly t: 'pagina'; readonly fraccion: number }
+  /** Un mensaje del documento, ya leído con `leerLoQueDiceElDocumento`. */
+  | { readonly t: 'documento'; readonly m: MensajeDelDocumento }
+  /** Pasaron `AVISO_DE_TARDANZA_MS` sin poder jugar. */
+  | { readonly t: 'tardanza' }
+  /** Quien juega eligió seguir esperando. */
+  | { readonly t: 'seguir' };
+
+/** La parte de la barra que es la página en sí, mientras el documento no cuenta la suya. */
+export const PARTE_DE_LA_PAGINA = 0.04;
+
+export const CARGA_INICIAL: CargaDeLaNoche = {
+  fraccion: 0,
+  etapa: 'pagina',
+  que: 'la página',
+  cuenta: false,
+  listo: false,
+  jugable: false,
+  fallo: null,
+  aviso: null,
+  esperas: 0,
+};
+
+/** LA CARGA TRAS UN SUCESO. Pura: la comprueba `verify:liza-protocolo`. */
+export function cargaTras(c: CargaDeLaNoche, s: SucesoDeLaCarga): CargaDeLaNoche {
+  if (c.jugable) return c;
+  switch (s.t) {
+    case 'pagina': {
+      if (c.cuenta || !Number.isFinite(s.fraccion)) return c;
+      const f = Math.max(c.fraccion, PARTE_DE_LA_PAGINA * Math.min(1, Math.max(0, s.fraccion)));
+      return f === c.fraccion ? c : { ...c, fraccion: f };
+    }
+    case 'tardanza':
+      return c.aviso !== null ? c : { ...c, aviso: 'tardanza' };
+    case 'seguir':
+      return { ...c, aviso: null, esperas: c.esperas + 1 };
+    case 'documento': {
+      const m = s.m;
+      switch (m.t) {
+        case 'carga':
+          return { ...c, cuenta: true, fraccion: Math.max(c.fraccion, m.fraccion), etapa: m.etapa, que: m.que };
+        case 'listo':
+          /* Un documento que no cuenta su carga lo dice al final: ése ya se puede jugar. */
+          return c.cuenta ? { ...c, listo: true } : { ...c, listo: true, jugable: true, fraccion: 1, aviso: null };
+        case 'jugable':
+          return { ...c, listo: true, jugable: true, fraccion: 1, aviso: null };
+        case 'fallo':
+          return { ...c, fallo: m.motivo, aviso: 'fallo' };
+        default:
+          return c;
+      }
+    }
+  }
+}
+
+/** LA RAZÓN PROBABLE de que tarde, para el aviso: por dónde va la carga, o el fallo que dijo el documento. */
+export function razonProbable(c: CargaDeLaNoche): string {
+  if (c.aviso === 'fallo' && c.fallo !== null) return `El juego ha fallado al arrancar: ${c.fallo}`;
+  if (!c.cuenta) {
+    return c.fraccion >= PARTE_DE_LA_PAGINA
+      ? 'La página ha llegado pero el juego no contesta: o su código baja muy despacio, o el visor del teléfono no lo ejecuta.'
+      : 'La página del juego no termina de llegar: la conexión parece muy lenta o cortada.';
+  }
+  switch (c.etapa) {
+    case 'pagina':
+      return 'La página del juego no termina de llegar: la conexión parece muy lenta o cortada.';
+    case 'codigo':
+      return 'El código del juego (unos 2,5 MB) baja muy despacio: la conexión es lenta.';
+    case 'mesa':
+      return 'El juego está listo pero la mesa no le llega: puede que se haya cortado la conexión con el servidor.';
+    case 'ciudad':
+      return 'El juego se está montando y el teléfono va muy justo.';
+    case 'personajes':
+      return 'Los personajes bajan muy despacio: la conexión es lenta.';
+    case 'graficos':
+      return 'El teléfono está preparando los gráficos y va muy justo.';
+  }
 }

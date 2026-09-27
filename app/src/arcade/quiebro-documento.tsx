@@ -81,6 +81,11 @@ export interface LoQueVeElDocumento {
   readonly buzon: MutableRefObject<((texto: string) => void) | null>;
   /** La superficie no puede enseñar el documento: el motivo, para la nota del respaldo. */
   readonly alFallar: (motivo: string) => void;
+  /**
+   * Cuánto lleva la PÁGINA (0..1), según la superficie: el `onLoadProgress` del WebView; el `iframe` sólo
+   * sabe cuándo acabó. Es el primer tramo de la barra, antes de que el documento cuente lo suyo.
+   */
+  readonly alProgresarLaPagina: (fraccion: number) => void;
 }
 
 /**
@@ -101,7 +106,7 @@ export function hayVisorEnEsteBinario(): boolean {
  */
 const ElVisorPerezoso = lazy(() => import('react-native-webview').then((m) => ({ default: m.WebView })));
 
-export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon, alFallar }: LoQueVeElDocumento): JSX.Element {
+export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon, alFallar, alProgresarLaPagina }: LoQueVeElDocumento): JSX.Element {
   const visor = useRef<ElVisor | null>(null);
   const hayVisor = hayVisorEnEsteBinario();
 
@@ -148,6 +153,7 @@ export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon, alF
         originWhitelist={[origen]}
         onShouldStartLoadWithRequest={soloElDocumento}
         onMessage={alHablar}
+        onLoadProgress={(e) => alProgresarLaPagina(e.nativeEvent.progress)}
         onError={(e) => alFallar(`el documento no ha cargado: ${e.nativeEvent.description}`)}
         onHttpError={(e) => alFallar(`el servidor contestó ${String(e.nativeEvent.statusCode)} al pedir el documento`)}
         onRenderProcessGone={() => alFallar('el motor del navegador del teléfono se ha cerrado (poca memoria)')}

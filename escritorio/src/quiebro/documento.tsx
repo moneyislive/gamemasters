@@ -6,11 +6,18 @@
  *
  * ═══ EL PUENTE, EN LOS DOS SENTIDOS ═══
  *
- *   · Al cargar, el documento dice `listo` y espera un `mesa`. Cada `mesa` que llega es la foto de AHORA
- *     (código, asiento, llave, servidor, vista, opciones, revisión) y con ella se avisa al juego.
+ *   · El `listo` ya no sale de aquí: lo dice el guion de arranque de `quiebro.html` en cuanto se lee la
+ *     página, y guarda en una cola lo que el anfitrión mande mientras baja este paquete (ver
+ *     `DONDE_ARRANCA` en `contrato.ts`). `ConAnfitrion`, al montar, pone sus entradas, TOMA la cola y la
+ *     atiende en orden; sólo si no hubiera guion (o no pudo hablar) dice `listo` él, como antes.
+ *   · Cada `mesa` que llega es la foto de AHORA (código, asiento, llave, servidor, vista, opciones,
+ *     revisión) y con ella se avisa al juego.
  *   · El juego mueve con `mover`: sale un `mover {id, movimiento}` y la promesa se cumple con el `movido`
  *     de ese `id` (o `sin-red` si no llega en `ESPERA_DEL_MOVIDO_MS`).
  *   · `salir` y `medida` salen cuando el juego los pide.
+ *   · LA CARGA: el arranque cuenta la página y el paquete; desde aquí se sigue con la mesa y, ya en el
+ *     juego, la ciudad, los personajes y los gráficos (`alPreparar` de `<Quiebro>`), hasta `jugable`
+ *     (`alJugable`), que es cuando la app quita su barra.
  *
  * ═══ DE QUIÉN SE ACEPTA ═══
  *
@@ -35,14 +42,14 @@
  * `visibilitychange`; el WebView de Android no siempre, así que la app le mete `EVENTO_DEL_FONDO` con
  * `injectJavaScript` al cambiar su `AppState`. Aquí no hay nada que hacer: lo escucha el juego.
  */
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { JSX } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Opcion } from '../../../shared/arcade';
 import type { MovimientoDeclarado } from '../../../shared/mecanicas/tablero-declarado';
 import { NOMBRES_DEL_QUIEBRO } from '../../../shared/arcade/juegos/quiebro-nombres';
-import { VERSION_DEL_PUENTE, leerMensajeDelAnfitrion, textoDelDocumento, vieneDelAnfitrion } from './contrato';
-import type { MensajeDelDocumento, MesaParaElDocumento, PuertoDeMesa, SalidaDelMovimiento } from './contrato';
+import { DONDE_ARRANCA, VERSION_DEL_PUENTE, leerMensajeDelAnfitrion, textoDelDocumento, vieneDelAnfitrion } from './contrato';
+import type { ArranqueDelDocumento, EtapaDeLaCarga, MensajeDelDocumento, MesaParaElDocumento, PuertoDeMesa, SalidaDelMovimiento } from './contrato';
 import { Quiebro } from './Quiebro';
 import { PuertoDePrueba } from './red/puerto-de-prueba';
 import './hud/hud.css';
@@ -62,6 +69,25 @@ function anfitrionesFijados(): readonly string[] {
 interface VentanaConPuente {
   ReactNativeWebView?: { postMessage(texto: string): void };
   quiebroDelAnfitrion?: (texto: string) => void;
+}
+
+/**
+ * EL ARRANQUE DE `quiebro.html`, si está: el guion lo deja en `window[DONDE_ARRANCA]`. Se mira que tenga
+ * sus funciones; si no (una página sin guion), el paquete hace lo de antes y la barra no avanza.
+ */
+function elArranque(): ArranqueDelDocumento | null {
+  const a = (window as unknown as Record<string, unknown>)[DONDE_ARRANCA] as Partial<ArranqueDelDocumento> | undefined;
+  if (a === undefined || a === null || typeof a.tomar !== 'function' || typeof a.avanzar !== 'function' || typeof a.jugable !== 'function') return null;
+  return a as ArranqueDelDocumento;
+}
+const ARRANQUE = elArranque();
+
+/** La barra, de aquí en adelante (con el arranque; sin él, nada). */
+function avanzar(fraccion: number, etapa: EtapaDeLaCarga, que: string): void {
+  ARRANQUE?.avanzar(fraccion, etapa, que);
+}
+function yaSePuedeJugar(): void {
+  ARRANQUE?.jugable();
 }
 
 /**
@@ -162,15 +188,23 @@ function ConAnfitrion(): JSX.Element {
     [ventana, origenDelAnfitrion],
   );
 
+  /*
+   * El puerto vivo, en una referencia y no en el efecto: el efecto se rehace cuando se sabe el origen del
+   * anfitrión (`mandar` cambia), y con una variable suya el puerto se olvidaba —y con él los `movido` de lo
+   * que el juego ya había pedido— hasta la mesa siguiente. Antes lo tapaba un `listo` repetido en cada
+   * vuelta; ahora el `listo` lo dice una vez el arranque.
+   */
+  const actualVivo = useRef<PuertoDelPuente | null>(null);
   useEffect(() => {
-    let actual: PuertoDelPuente | null = null;
     const atender = (texto: unknown): void => {
       const m = leerMensajeDelAnfitrion(texto);
       if (m === null) return;
+      const actual = actualVivo.current;
       if (m.t === 'mesa') {
         if (actual === null || actual.codigo !== m.codigo || actual.llave !== m.llave) {
-          actual = new PuertoDelPuente(m, mandar);
-          ponerPuerto(actual);
+          const nuevo = new PuertoDelPuente(m, mandar);
+          actualVivo.current = nuevo;
+          ponerPuerto(nuevo);
         } else actual.ponerMesa(m);
         return;
       }
@@ -184,12 +218,29 @@ function ConAnfitrion(): JSX.Element {
     window.addEventListener('message', alMensaje);
     /* El WebView de la app entra por aquí (con `injectJavaScript`): no hay otra ventana ni origen. */
     ventana.quiebroDelAnfitrion = (texto: string) => atender(texto);
-    mandar({ t: 'listo', v: VERSION_DEL_PUENTE });
+    /*
+     * LO QUE LLEGÓ MIENTRAS BAJABA EL PAQUETE, en orden y con el mismo filtro que un mensaje de ahora: lo del
+     * iframe, sólo si su origen es el del anfitrión; lo del WebView (`origen` nulo), tal cual. Se toma DESPUÉS
+     * de poner las entradas de arriba y en el mismo turno: no hay hueco en que algo se pierda.
+     */
+    for (const g of ARRANQUE?.tomar() ?? []) {
+      if (g.origen === null) {
+        atender(g.texto);
+      } else if (vieneDelAnfitrion(g.origen, location.origin, anfitrionesFijados())) {
+        ponerOrigen(g.origen);
+        atender(g.texto);
+      }
+    }
+    if (ARRANQUE?.dijoListo !== true) mandar({ t: 'listo', v: VERSION_DEL_PUENTE });
     return () => {
       window.removeEventListener('message', alMensaje);
       delete ventana.quiebroDelAnfitrion;
     };
   }, [mandar, ventana]);
+
+  useEffect(() => {
+    if (puerto === null) avanzar(0.72, 'mesa', 'la mesa');
+  }, [puerto]);
 
   if (puerto === null) return <Esperando texto="Esperando a la mesa…" />;
   return (
@@ -198,6 +249,8 @@ function ConAnfitrion(): JSX.Element {
       incrustado
       alSalir={() => mandar({ t: 'salir', v: VERSION_DEL_PUENTE })}
       alMedir={(nivel, calidad) => mandar({ t: 'medida', v: VERSION_DEL_PUENTE, calidad, nivel })}
+      alPreparar={avanzar}
+      alJugable={yaSePuedeJugar}
     />
   );
 }
@@ -233,12 +286,20 @@ function DePrueba({ codigo }: { readonly codigo: string | null }): JSX.Element {
       abierto?.cerrar();
     };
   }, [aLaMesa, intento]);
+  /* La barra del arranque tapa la pantalla: un fallo del modo de prueba tiene su botón y se tiene que ver. */
+  useEffect(() => {
+    if (fallo !== null) ARRANQUE?.apartar();
+    else if (puerto === null) avanzar(0.72, 'mesa', 'la mesa de prueba');
+  }, [fallo, puerto]);
+
   if (fallo !== null) return <Esperando texto={fallo} reintentar={() => ponerIntento((n) => n + 1)} />;
   if (puerto === null) return <Esperando texto={aLaMesa === null ? 'Abriendo una mesa de prueba…' : `Sentándose en la mesa ${aLaMesa}…`} />;
   return (
     <Quiebro
       puerto={puerto}
       incrustado={false}
+      alPreparar={avanzar}
+      alJugable={yaSePuedeJugar}
       enlaceParaEntrar={enlaceParaEntrar(puerto.codigo)}
       alOtraMesa={() => {
         puerto.cerrar();

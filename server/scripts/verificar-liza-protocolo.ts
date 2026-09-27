@@ -181,6 +181,7 @@ import {
   MOVIMIENTO_DEL_QUIEBRO,
 } from '../../shared/arcade/juegos/quiebro-vista';
 import {
+  ETAPAS_DE_LA_CARGA,
   leerMensajeDelAnfitrion,
   leerMensajeDelDocumento,
   origenDelAnfitrion,
@@ -1978,9 +1979,14 @@ paso('El puente entre el anfitrión y el documento');
     { t: 'mover', v: 1, id: 5, movimiento: { tipo: 'empezar', carga: null } },
     { t: 'salir', v: 1 },
     { t: 'medida', v: 1, calidad: 'plena', nivel: 2 },
+    { t: 'carga', v: 1, fraccion: 0.03, etapa: 'pagina', que: 'la página' },
+    { t: 'carga', v: 1, fraccion: 0.41, etapa: 'codigo', que: 'el código del juego (1,2 de 2,4 MB)' },
+    { t: 'carga', v: 1, fraccion: 1, etapa: 'graficos', que: 'los gráficos' },
+    { t: 'jugable', v: 1 },
+    { t: 'fallo', v: 1, motivo: 'TypeError: x is not a function (Quiebro-H.js:1)' },
   ];
   for (const m of DEL_DOCUMENTO) {
-    const cual = m.t === 'mover' ? `mover ${m.movimiento.tipo}` : m.t;
+    const cual = m.t === 'mover' ? `mover ${m.movimiento.tipo}` : m.t === 'carga' ? `carga ${m.etapa}` : m.t;
     comprobar(`el documento: \`${cual}\` va y vuelve igual`, igual(leerMensajeDelDocumento(textoDelDocumento(m)), m));
   }
 
@@ -2010,8 +2016,120 @@ paso('El puente entre el anfitrión y el documento');
     ['una medida que se contradice (N0 plena)', j({ t: 'medida', v: 1, calidad: 'plena', nivel: 0 })],
     ['una medida del nivel 4', j({ t: 'medida', v: 1, calidad: 'plena', nivel: 4 })],
     ['un salir con una clave de más', j({ t: 'salir', v: 1, porque: 'x' })],
+    ['una carga de más de 1', j({ t: 'carga', v: 1, fraccion: 1.2, etapa: 'codigo', que: 'x' })],
+    ['una carga negativa', j({ t: 'carga', v: 1, fraccion: -0.1, etapa: 'codigo', que: 'x' })],
+    ['una carga que no es un número (texto)', j({ t: 'carga', v: 1, fraccion: '0.5', etapa: 'codigo', que: 'x' })],
+    ['una carga de una etapa que no existe', j({ t: 'carga', v: 1, fraccion: 0.5, etapa: 'musica', que: 'x' })],
+    ['una carga sin qué', j({ t: 'carga', v: 1, fraccion: 0.5, etapa: 'codigo', que: '' })],
+    ['una carga con un qué de 81 letras', j({ t: 'carga', v: 1, fraccion: 0.5, etapa: 'codigo', que: 'x'.repeat(81) })],
+    ['una carga sin la etapa', j({ t: 'carga', v: 1, fraccion: 0.5, que: 'x' })],
+    ['una carga de otra versión', j({ t: 'carga', v: 2, fraccion: 0.5, etapa: 'codigo', que: 'x' })],
+    ['un jugable con una clave de más', j({ t: 'jugable', v: 1, ya: true })],
+    ['un fallo vacío', j({ t: 'fallo', v: 1, motivo: '' })],
+    ['un fallo de 301 letras', j({ t: 'fallo', v: 1, motivo: 'x'.repeat(301) })],
+    ['un fallo con el motivo en número', j({ t: 'fallo', v: 1, motivo: 7 })],
   ];
   for (const [que, dato] of MALOS_DEL_DOCUMENTO) comprobar(`el anfitrión rechaza del documento: ${que}`, leerMensajeDelDocumento(dato) === null);
+
+  /*
+   * ═══ LOS DOS LECTORES DEL DOCUMENTO DICEN LO MISMO ═══
+   *
+   * La app no puede importar el lector del contrato (Metro no ve `escritorio/`) y lleva una copia en
+   * `app/src/arcade/quiebro-puente.ts`. Aquí se cargan los dos y se les da lo mismo: cada mensaje bueno y
+   * cada envenenado de arriba. Si la copia se queda atrás —un `carga` que la app no entiende—, la barra de
+   * la app no avanza nunca y sólo lo diría el aviso de los tres minutos.
+   *
+   * Y la carga como la ve la app (`cargaTras`): sin plazo (ningún suceso la lleva al plano), el aviso de los
+   * tres minutos sólo con `tardanza`, el documento viejo que se quita con `listo`, y el `fallo` a la vista.
+   */
+  interface CargaDeLaApp {
+    readonly fraccion: number;
+    readonly etapa: string;
+    readonly cuenta: boolean;
+    readonly listo: boolean;
+    readonly jugable: boolean;
+    readonly fallo: string | null;
+    readonly aviso: 'tardanza' | 'fallo' | null;
+    readonly esperas: number;
+  }
+  interface PuenteDeLaApp {
+    leerLoQueDiceElDocumento(d: unknown): unknown;
+    versionAjenaDelDocumento(d: unknown): number | null;
+    cargaTras(c: CargaDeLaApp, s: unknown): CargaDeLaApp;
+    razonProbable(c: CargaDeLaApp): string;
+    readonly CARGA_INICIAL: CargaDeLaApp;
+    readonly AVISO_DE_TARDANZA_MS: number;
+    readonly ETAPAS_DE_LA_CARGA: readonly string[];
+  }
+  let deLaApp: PuenteDeLaApp | null = null;
+  try {
+    deLaApp = (await import(pathToFileURL(path.join(REPO, 'app', 'src', 'arcade', 'quiebro-puente.ts')).href)) as PuenteDeLaApp;
+  } catch (e) {
+    nota(`el puente de la app no se carga: ${e instanceof Error ? e.message : String(e)}`);
+  }
+  comprobar('se carga el lector de la app (`app/src/arcade/quiebro-puente.ts`)', deLaApp !== null);
+  if (deLaApp !== null) {
+    const app = deLaApp;
+    const buenos = DEL_DOCUMENTO.map((m) => textoDelDocumento(m));
+    const distintos = [...buenos, ...MALOS_DEL_DOCUMENTO.map(([, d]) => d)].filter((d) => !igual(app.leerLoQueDiceElDocumento(d), leerMensajeDelDocumento(d)));
+    comprobar(
+      `los dos lectores del documento —el del contrato y la copia de la app— dicen lo mismo de ${String(buenos.length)} mensajes buenos y ${String(MALOS_DEL_DOCUMENTO.length)} envenenados (\`carga\`, \`jugable\` y \`fallo\` incluidos)`,
+      distintos.length === 0 && buenos.every((b) => app.leerLoQueDiceElDocumento(b) !== null),
+      distintos,
+    );
+    comprobar('y las etapas de la carga son las mismas en los dos lados', igual(app.ETAPAS_DE_LA_CARGA, ETAPAS_DE_LA_CARGA));
+
+    const doc = (m: MensajeDelDocumento): { t: 'documento'; m: MensajeDelDocumento } => ({ t: 'documento', m });
+    const tras = (sucesos: readonly unknown[]): CargaDeLaApp => sucesos.reduce<CargaDeLaApp>((c, s) => app.cargaTras(c, s), app.CARGA_INICIAL);
+    /* El documento nuevo: cuenta, dice listo (que NO quita la barra), avanza y dice jugable. */
+    const nueva = tras([
+      { t: 'pagina', fraccion: 0.5 },
+      doc({ t: 'carga', v: 1, fraccion: 0.03, etapa: 'pagina', que: 'la página' }),
+      doc({ t: 'listo', v: 1 }),
+      doc({ t: 'carga', v: 1, fraccion: 0.4, etapa: 'codigo', que: 'el código del juego' }),
+      doc({ t: 'carga', v: 1, fraccion: 0.2, etapa: 'codigo', que: 'el código del juego' }),
+    ]);
+    comprobar(
+      'la barra de la app sigue al documento, nunca hacia atrás, y `listo` no la quita (la quita `jugable`)',
+      nueva.cuenta && nueva.listo && !nueva.jugable && nueva.fraccion === 0.4 && nueva.etapa === 'codigo' && nueva.aviso === null,
+      nueva,
+    );
+    comprobar('`jugable` la quita y la llena', tras([doc({ t: 'carga', v: 1, fraccion: 0.5, etapa: 'codigo', que: 'x' }), doc({ t: 'jugable', v: 1 })]).jugable);
+    const vieja = tras([{ t: 'pagina', fraccion: 1 }, doc({ t: 'listo', v: 1 })]);
+    comprobar('un documento de antes del 27-sep (dice `listo` sin haber contado nada) se da por jugable con ese `listo`', vieja.jugable && vieja.fraccion === 1, vieja);
+    /*
+     * SIN PLAZO: se le da a la carga una avalancha de sucesos de todas las clases, en ningún orden en
+     * particular, y ninguno la deja «caída»: la forma de la carga ni siquiera tiene dónde decirlo. Lo que
+     * lleva al plano sin preguntar vive en la pantalla y es un fallo de verdad; eso lo mira `verify:sala`.
+     */
+    const clavesDeLaCarga = Object.keys(app.CARGA_INICIAL).sort().join(',');
+    comprobar(
+      'la carga de la app no tiene ningún campo de «caída» ni de plazo: sólo fracción, etapa, qué, cuenta, listo, jugable, fallo, aviso y esperas',
+      clavesDeLaCarga === 'aviso,cuenta,esperas,etapa,fallo,fraccion,jugable,listo,que',
+      clavesDeLaCarga,
+    );
+    const sinTardanza = tras(Array.from({ length: 500 }, (_, i) => (i % 3 === 0 ? { t: 'pagina', fraccion: i / 500 } : doc({ t: 'carga', v: 1, fraccion: i / 1000, etapa: 'codigo', que: 'x' }))));
+    comprobar('sin la `tardanza`, por mucho que dure la carga no sale aviso', sinTardanza.aviso === null && !sinTardanza.jugable, sinTardanza);
+    const tarde = tras([doc({ t: 'carga', v: 1, fraccion: 0.3, etapa: 'codigo', que: 'x' }), { t: 'tardanza' }]);
+    comprobar(
+      'con la `tardanza` (los tres minutos) sale el aviso con la razón probable de su etapa, y la carga sigue viva',
+      tarde.aviso === 'tardanza' && !tarde.jugable && /código del juego/.test(app.razonProbable(tarde)) && app.AVISO_DE_TARDANZA_MS === 180_000,
+      { tarde, razon: app.razonProbable(tarde), ms: app.AVISO_DE_TARDANZA_MS },
+    );
+    const siguio = app.cargaTras(tarde, { t: 'seguir' });
+    comprobar('«seguir esperando» quita el aviso y cuenta una espera más (la pantalla vuelve a contar tres minutos)', siguio.aviso === null && siguio.esperas === 1 && !siguio.jugable);
+    comprobar('y la carga sigue hasta `jugable` después de avisar', app.cargaTras(app.cargaTras(siguio, doc({ t: 'carga', v: 1, fraccion: 0.8, etapa: 'personajes', que: 'x' })), doc({ t: 'jugable', v: 1 })).jugable);
+    const fallida = tras([doc({ t: 'carga', v: 1, fraccion: 0.3, etapa: 'codigo', que: 'x' }), doc({ t: 'fallo', v: 1, motivo: 'TypeError: se rompió' })]);
+    comprobar('un `fallo` del documento sale en el acto, con su motivo en la razón, sin esperar a los tres minutos', fallida.aviso === 'fallo' && /TypeError: se rompió/.test(app.razonProbable(fallida)), app.razonProbable(fallida));
+    comprobar(
+      'un puente de otra versión se reconoce (es un fallo de verdad), y lo que no es del documento no',
+      app.versionAjenaDelDocumento(j({ t: 'listo', v: 2 })) === 2 &&
+        app.versionAjenaDelDocumento(j({ t: 'carga', v: 3, fraccion: 0, etapa: 'pagina', que: 'x' })) === 3 &&
+        app.versionAjenaDelDocumento(j({ t: 'listo', v: 1 })) === null &&
+        app.versionAjenaDelDocumento(j({ t: 'hola', v: 2 })) === null &&
+        app.versionAjenaDelDocumento('no es JSON') === null,
+    );
+  }
 
   const PROPIO = 'https://harkania.onrender.com';
   comprobar('el anfitrión de un documento es su propio origen; sin origen propio, ninguno', origenDelAnfitrion(PROPIO) === PROPIO && origenDelAnfitrion('null') === null && origenDelAnfitrion('') === null);
@@ -2839,10 +2957,12 @@ paso('El HUD: del mundo al minimapa y al plano');
  * tres de su forma transitoria y de la ampliación, que pierde las dos suyas. Si un bloque deja de correr,
  * sale 2 y no verde. El tiro cargado (W) trae cuarenta y una: su forma y su cable (dos), el aforo de balas
  * que es de las entidades (dos), sus treinta roturas —las veinticuatro de su forma y las seis de lo que pide
- * de la liza entera—, los seis `estalla` que se rechazan y su plaza de bala en el coste (una).
+ * de la liza entera—, los seis `estalla` que se rechazan y su plaza de bala en el coste (una). La carga del
+ * documento (27-sep) trae treinta: cinco mensajes que van y vuelven, doce envenenados, y trece de los dos
+ * lectores y de la carga como la ve la app (sin plazo, el aviso de los tres minutos, el `fallo`).
  */
 terminar({
-  escritas: 520,
+  escritas: 550,
   enVerde:
     'El cable de la Liza va y vuelve en los dos sentidos, rechaza lo que no es exactamente un mensaje y lo\n' +
     '  más largo cabe; la liza de juguete se declara sin problemas y sus versiones rotas no, y lo mismo las\n' +

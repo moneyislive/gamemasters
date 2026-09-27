@@ -104,7 +104,15 @@ export interface PuertoDeMesa {
 
 /* ─── EL PUENTE ──────────────────────────────────────────────────────────── */
 
-/** La versión del puente. Se sube si cambia la forma de un mensaje. */
+/**
+ * La versión del puente. Se sube si cambia la forma de un mensaje QUE YA EXISTE.
+ *
+ * AÑADIR un mensaje no la sube (27-sep: `carga`, `jugable` y `fallo`). Los lectores de los dos lados tiran
+ * lo que no conocen, así que la app 1.8.0 —que no sabe de ellos— los ignora y sigue jugando con `listo`,
+ * `mesa`, `mover`, `movido`, `salir` y `medida` como siempre. Subirla, en cambio, haría que esa app tirase
+ * TAMBIÉN el `listo` del documento nuevo del servidor: los teléfonos que no se han actualizado se quedarían
+ * sin noche. La app instalada habla con el documento que sirva el servidor ese día, no con el de su APK.
+ */
 export const VERSION_DEL_PUENTE = 1;
 
 /** El tope de un mensaje del puente, en letras: una vista con su tablero cabe de sobra. */
@@ -169,7 +177,101 @@ export interface Medida {
   readonly nivel: number;
 }
 
-export type MensajeDelDocumento = Listo | Mover | Salir | Medida;
+/**
+ * DE QUÉ VA LA CARGA, para que el anfitrión diga la razón probable si tarda (`razonProbable` de la app):
+ *   · `pagina`: el HTML del documento y su guion de arranque;
+ *   · `codigo`: el paquete del juego (≈2,5 MB de JavaScript: el motor 3D y el juego);
+ *   · `mesa`: el código ya corre y espera la primera `mesa` del anfitrión;
+ *   · `ciudad`: el juego montado, la ciudad armándose;
+ *   · `personajes`: los `.glb` de los personajes bajando;
+ *   · `graficos`: compilando los sombreadores (con la caché del navegador fría son segundos).
+ */
+export type EtapaDeLaCarga = 'pagina' | 'codigo' | 'mesa' | 'ciudad' | 'personajes' | 'graficos';
+
+export const ETAPAS_DE_LA_CARGA: readonly EtapaDeLaCarga[] = ['pagina', 'codigo', 'mesa', 'ciudad', 'personajes', 'graficos'];
+
+/** El tope de la línea de «qué se está cargando», en letras. */
+export const TOPE_DE_LO_QUE_CARGA = 80;
+
+/** El tope del motivo de un `fallo`, en letras. */
+export const TOPE_DEL_FALLO = 300;
+
+/**
+ * DOCUMENTO → ANFITRIÓN: cuánto lleva cargado (`fraccion`, 0..1, nunca hacia atrás), de qué etapa y una
+ * línea para la persona (`que`, «el código del juego (1,2 de 2,5 MB)»). Sale del guion de arranque de
+ * `quiebro.html` desde el primer instante, antes de que exista una línea de React; y luego del juego.
+ */
+export interface Carga {
+  readonly t: 'carga';
+  readonly v: number;
+  readonly fraccion: number;
+  readonly etapa: EtapaDeLaCarga;
+  readonly que: string;
+}
+
+/**
+ * DOCUMENTO → ANFITRIÓN: ya se puede jugar —el juego montado, los personajes bajados y los sombreadores
+ * compilados—. El anfitrión quita su barra de carga con esto, no con `listo`.
+ */
+export interface Jugable {
+  readonly t: 'jugable';
+  readonly v: number;
+}
+
+/**
+ * DOCUMENTO → ANFITRIÓN: algo ha fallado al arrancar (un error de JavaScript, una promesa rechazada, un
+ * trozo del paquete que no baja). No es un «me rindo»: el anfitrión lo ENSEÑA en vez de esperar a ciegas,
+ * y quien juega decide si sigue esperando, reintenta o juega sobre el plano.
+ */
+export interface Fallo {
+  readonly t: 'fallo';
+  readonly v: number;
+  readonly motivo: string;
+}
+
+export type MensajeDelDocumento = Listo | Mover | Salir | Medida | Carga | Jugable | Fallo;
+
+/* ─── EL ARRANQUE: LO QUE EL GUION DE `quiebro.html` DEJA PUESTO ANTES DEL PAQUETE ─── */
+
+/**
+ * EL NOMBRE, EN `window`, DEL ARRANQUE DEL DOCUMENTO: el guion diminuto que va DENTRO de `quiebro.html`
+ * y corre antes de que baje el paquete del juego.
+ *
+ * ═══ POR QUÉ `listo` NO PUEDE ESPERAR AL PAQUETE ═══
+ *
+ * Hasta el 27-sep el documento decía `listo` al montar `ConAnfitrion`, o sea con los 2,5 MB del juego ya
+ * bajados y arrancados, y la app le daba 25 s. En un teléfono con datos móviles eso no llega: el menú
+ * aparecía justo cuando la app cortaba y caía al plano. Ahora el guion dice `listo` en cuanto se lee el
+ * HTML y deja ya puestas las dos entradas del anfitrión —`window.quiebroDelAnfitrion` y el oyente de
+ * `message`— como una COLA que guarda lo que llegue. `ConAnfitrion`, al montar, la TOMA (`tomar()`), pone
+ * sus propias entradas y atiende lo guardado en orden. Nada se pierde entre medias: la mesa que la app
+ * manda al oír `listo` espera en la cola.
+ *
+ * En la cola cada mensaje va con su ORIGEN (`null` en el WebView, donde entra por `injectJavaScript`): el
+ * guion ya filtra por origen, y `ConAnfitrion` lo vuelve a comprobar con `vieneDelAnfitrion` al tomarla.
+ */
+export const DONDE_ARRANCA = 'quiebroArranque';
+
+/** Un mensaje del anfitrión guardado por el guion antes de montar. */
+export interface MensajeGuardado {
+  readonly texto: unknown;
+  /** El origen del evento `message`; `null` si entró por `quiebroDelAnfitrion` (el WebView). */
+  readonly origen: string | null;
+}
+
+/** LO QUE EL GUION DE ARRANQUE OFRECE AL PAQUETE (`window[DONDE_ARRANCA]`). */
+export interface ArranqueDelDocumento {
+  /** Si el guion ya dijo `listo`: entonces el paquete no lo repite. */
+  readonly dijoListo: boolean;
+  /** Lo guardado hasta ahora, en orden, y deja de guardar: desde aquí escucha el paquete. */
+  tomar(): MensajeGuardado[];
+  /** Avanza la barra (la del documento y la del anfitrión). Nunca hacia atrás. */
+  avanzar(fraccion: number, etapa: EtapaDeLaCarga, que: string): void;
+  /** Ya se puede jugar: quita la barra del documento y se lo dice al anfitrión. */
+  jugable(): void;
+  /** Quita la barra sin decir `jugable` (el documento enseña su propia pantalla: un fallo del modo de prueba). */
+  apartar(): void;
+}
 
 /* ─── LOS LECTORES ESTRICTOS ─────────────────────────────────────────────── */
 
@@ -211,6 +313,15 @@ function esServidor(v: unknown): v is string {
 
 function esResultado(v: unknown): v is ResultadoDelMovimiento {
   return v === 'hecho' || v === 'rechazado' || v === 'sin-red';
+}
+
+function esEtapa(v: unknown): v is EtapaDeLaCarga {
+  return typeof v === 'string' && (ETAPAS_DE_LA_CARGA as readonly string[]).includes(v);
+}
+
+/** Una fracción de 0 a 1, finita. */
+function esFraccion(v: unknown): v is number {
+  return typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 1;
 }
 
 /** Una opción de la mesa, con exactamente las claves de `Opcion` (y `declaracion: true` si la trae). */
@@ -274,6 +385,7 @@ export function leerMensajeDelDocumento(dato: unknown): MensajeDelDocumento | nu
     if (v.v !== VERSION_DEL_PUENTE) return null;
     if (v.t === 'listo') return { t: 'listo', v: v.v };
     if (v.t === 'salir') return { t: 'salir', v: v.v };
+    if (v.t === 'jugable') return { t: 'jugable', v: v.v };
     return null;
   }
   if (conClaves(v, ['t', 'v', 'id', 'movimiento'])) {
@@ -290,6 +402,16 @@ export function leerMensajeDelDocumento(dato: unknown): MensajeDelDocumento | nu
     /* Hacia fuera, N0 es sobria y N1-N3 plena: un mensaje que dice otra cosa se contradice. */
     if ((v.nivel === 0) !== (v.calidad === 'sobria')) return null;
     return { t: 'medida', v: v.v, calidad: v.calidad, nivel: v.nivel };
+  }
+  if (conClaves(v, ['t', 'v', 'fraccion', 'etapa', 'que'])) {
+    if (v.t !== 'carga' || v.v !== VERSION_DEL_PUENTE || !esFraccion(v.fraccion) || !esEtapa(v.etapa)) return null;
+    if (typeof v.que !== 'string' || v.que.length < 1 || v.que.length > TOPE_DE_LO_QUE_CARGA) return null;
+    return { t: 'carga', v: v.v, fraccion: v.fraccion, etapa: v.etapa, que: v.que };
+  }
+  if (conClaves(v, ['t', 'v', 'motivo'])) {
+    if (v.t !== 'fallo' || v.v !== VERSION_DEL_PUENTE) return null;
+    if (typeof v.motivo !== 'string' || v.motivo.length < 1 || v.motivo.length > TOPE_DEL_FALLO) return null;
+    return { t: 'fallo', v: v.v, motivo: v.motivo };
   }
   return null;
 }
@@ -319,11 +441,16 @@ export function textoDelDocumento(m: MensajeDelDocumento): string {
   switch (m.t) {
     case 'listo':
     case 'salir':
+    case 'jugable':
       return JSON.stringify({ t: m.t, v: m.v });
     case 'mover':
       return JSON.stringify({ t: m.t, v: m.v, id: m.id, movimiento: { tipo: m.movimiento.tipo, carga: m.movimiento.carga } });
     case 'medida':
       return JSON.stringify({ t: m.t, v: m.v, calidad: m.calidad, nivel: m.nivel });
+    case 'carga':
+      return JSON.stringify({ t: m.t, v: m.v, fraccion: m.fraccion, etapa: m.etapa, que: m.que });
+    case 'fallo':
+      return JSON.stringify({ t: m.t, v: m.v, motivo: m.motivo });
   }
 }
 

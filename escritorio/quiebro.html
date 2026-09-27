@@ -11,6 +11,10 @@
       en plena pelea no puede agrandar la página) y `viewport-fit=cover` para pintar hasta los bordes
       redondeados; las zonas seguras las respeta el HUD con `env(safe-area-inset-*)`.
 
+      EL ARRANQUE (el segundo guion de abajo) va aquí dentro y no en el paquete: dice `listo` al anfitrión
+      en cuanto se lee esta página, guarda en una cola lo que el anfitrión mande hasta que el juego monte,
+      enseña la barra de carga y cuenta lo que baja. Ver `DONDE_ARRANCA` en `src/quiebro/contrato.ts`.
+
       Para jugar sin anfitrión (en un navegador, contra el servidor de este árbol):
         http://localhost:5291/sala/quiebro.html?prueba=1               abre una mesa nueva
         http://localhost:5291/sala/quiebro.html?prueba=1&codigo=XXXXX  se sienta en una ya abierta
@@ -62,6 +66,330 @@
         window.WebSocket = Filtrado;
       })();
     </script>
+    <script>
+      /*
+        ═══ EL ARRANQUE DEL DOCUMENTO: `listo` AL LEER LA PÁGINA, UNA COLA Y LA BARRA DE CARGA ═══
+
+        Corre antes de que baje nada del juego, así que es JavaScript viejo (sin flechas, sin `import`):
+        un visor que no entendiera una línea de aquí se quedaría sin `listo` y sin barra.
+
+          · LISTO YA. Se lo dice al anfitrión —el WebView de la app o la ventana de `/jugar`— en cuanto se
+            lee esto. Hasta el 27-sep lo decía el paquete al montar (≈2,5 MB después) y la app cortaba a
+            los 25 s: en un teléfono con datos móviles, el menú salía justo cuando la app caía al plano.
+          · LA COLA. `window.quiebroDelAnfitrion` (el WebView entra por ahí con `injectJavaScript`) y el
+            oyente de `message` (el iframe, SÓLO desde el propio origen o los fijados al compilar) guardan lo
+            que llega hasta que el paquete monta `ConAnfitrion`, que lo TOMA y lo atiende en orden. Si se
+            llenara, se tira lo más viejo: cada `mesa` es la foto entera, y la que vale es la última.
+          · LA CARGA. `carga {fraccion, etapa, que}` al anfitrión y a la barra de esta página, nunca hacia
+            atrás: la página, el código (contando los bytes que bajan de verdad: el empaquetado quita las
+            etiquetas del paquete y llama aquí a `bajar` con la lista de trozos y lo que pesa cada uno), y
+            luego lo que diga el juego (la mesa, la ciudad, los personajes, los gráficos) hasta `jugable`.
+          · LOS FALLOS. Un error de JavaScript o una promesa rechazada ANTES de `jugable`, o un trozo que no
+            baja, se le dicen al anfitrión (`fallo`) y se enseñan aquí: si en un teléfono la causa es otra
+            que la lentitud, la próxima vez se ve en pantalla en vez de esperar a ciegas.
+          · SIN PLAZO. Nada se rinde por tiempo. A los 3 minutos sin poder jugar, la barra de ESTA página
+            dice que tarda más de lo normal, con la razón probable (en la app lo dice la app, encima).
+
+        Los anfitriones fijados al compilar los escribe aquí `vite.config.ts` (`elArranqueDelQuiebro`), los
+        mismos que lee `documento.tsx`: nunca salen de un mensaje, de la dirección ni del almacén.
+      */
+      (function () {
+        var V = 1;
+        var w = window;
+        var FIJADOS = [/*ANFITRIONES_FIJADOS*/];
+        var AVISO_MS = 180000;
+        var ORIGEN = /^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/;
+        var propio = String(location.origin);
+        var enMarco = false;
+        try {
+          enMarco = w.parent !== w;
+        } catch (e) {
+          enMarco = true;
+        }
+        var origenDelAnfitrion = null;
+        var cola = [];
+        var tomada = false;
+        var fraccion = 0;
+        var etapa = 'pagina';
+        var que = 'la página';
+        var mandada = -1;
+        var etapaMandada = '';
+        var queMandado = '';
+        var cuandoMandada = 0;
+        var esJugable = false;
+        var apartada = false;
+        var fallos = 0;
+        var ultimoFallo = null;
+        var avisoVisible = false;
+
+        function nativo() {
+          var r = w.ReactNativeWebView;
+          return r && typeof r.postMessage === 'function' ? r : null;
+        }
+        function mandar(m) {
+          var texto = JSON.stringify(m);
+          var rn = nativo();
+          if (rn) {
+            try {
+              rn.postMessage(texto);
+            } catch (e) {}
+            return;
+          }
+          if (!enMarco) return;
+          var d = origenDelAnfitrion !== null ? [origenDelAnfitrion] : [propio].concat(FIJADOS);
+          for (var i = 0; i < d.length; i++) {
+            try {
+              w.parent.postMessage(texto, d[i]);
+            } catch (e) {}
+          }
+        }
+        function delAnfitrion(o) {
+          if (!ORIGEN.test(propio) || !ORIGEN.test(String(o))) return false;
+          if (o === propio) return true;
+          for (var i = 0; i < FIJADOS.length; i++) if (FIJADOS[i] === o) return true;
+          return false;
+        }
+        function guardar(texto, origen) {
+          if (tomada) return;
+          cola.push({ texto: texto, origen: origen });
+          if (cola.length > 200) cola.shift();
+        }
+        function alMensaje(e) {
+          if (!delAnfitrion(e.origin)) return;
+          origenDelAnfitrion = e.origin;
+          guardar(e.data, e.origin);
+        }
+        w.addEventListener('message', alMensaje);
+        w.quiebroDelAnfitrion = function (texto) {
+          guardar(texto, null);
+        };
+
+        /* ─── La barra de esta página ─── */
+        function el(id) {
+          return typeof document !== 'undefined' && document.getElementById ? document.getElementById(id) : null;
+        }
+        function razon() {
+          switch (etapa) {
+            case 'pagina':
+              return 'La página del juego no termina de llegar: la conexión parece muy lenta o cortada.';
+            case 'codigo':
+              return 'El código del juego (unos 2,5 MB) baja muy despacio: la conexión es lenta.';
+            case 'mesa':
+              return 'El juego está listo pero la mesa no le llega: puede que se haya cortado la conexión con el servidor.';
+            case 'personajes':
+              return 'Los personajes bajan muy despacio: la conexión es lenta.';
+            case 'graficos':
+              return 'El aparato está preparando los gráficos y va muy justo.';
+            default:
+              return 'El juego se está montando y el aparato va muy justo.';
+          }
+        }
+        function pintar() {
+          var raiz = el('q-arranque');
+          if (raiz === null) return;
+          if (esJugable || apartada) {
+            raiz.style.display = 'none';
+            return;
+          }
+          var barra = el('q-arranque-barra');
+          var cifra = el('q-arranque-cifra');
+          var linea = el('q-arranque-que');
+          var fallo = el('q-arranque-fallo');
+          var aviso = el('q-arranque-aviso');
+          var porque = el('q-arranque-razon');
+          if (barra) barra.style.width = (fraccion * 100).toFixed(1) + '%';
+          if (cifra) cifra.textContent = Math.floor(fraccion * 100) + ' %';
+          if (linea) linea.textContent = 'Cargando ' + que + '…';
+          if (fallo) {
+            fallo.textContent = ultimoFallo === null ? '' : 'Ha fallado algo al arrancar: ' + ultimoFallo;
+            fallo.style.display = ultimoFallo === null ? 'none' : '';
+          }
+          if (porque) porque.textContent = razon();
+          if (aviso) aviso.style.display = avisoVisible ? '' : 'none';
+          raiz.setAttribute('aria-valuenow', String(Math.floor(fraccion * 100)));
+        }
+
+        /* ─── Lo que se le dice al anfitrión ─── */
+        function avanzar(f, e, q) {
+          if (esJugable) return;
+          f = Number(f);
+          if (!(f >= 0)) f = 0;
+          if (f > 1) f = 1;
+          if (f < fraccion) f = fraccion;
+          fraccion = f;
+          etapa = String(e);
+          q = String(q || '').slice(0, 80);
+          if (q.length > 0) que = q;
+          pintar();
+          var ahora = Date.now();
+          if (fraccion - mandada >= 0.01 || etapa !== etapaMandada || (que !== queMandado && ahora - cuandoMandada > 300)) {
+            mandada = fraccion;
+            etapaMandada = etapa;
+            queMandado = que;
+            cuandoMandada = ahora;
+            mandar({ t: 'carga', v: V, fraccion: fraccion, etapa: etapa, que: que });
+          }
+        }
+        function jugable() {
+          if (esJugable) return;
+          fraccion = 1;
+          esJugable = true;
+          pintar();
+          mandar({ t: 'jugable', v: V });
+        }
+        function fallar(motivo) {
+          if (esJugable) return;
+          motivo = String(motivo).replace(/\s+/g, ' ').slice(0, 300);
+          if (motivo.length === 0 || fallos >= 8 || motivo === ultimoFallo) return;
+          fallos++;
+          ultimoFallo = motivo;
+          pintar();
+          mandar({ t: 'fallo', v: V, motivo: motivo });
+        }
+        function corto(u) {
+          u = String(u || '');
+          var i = u.lastIndexOf('/');
+          return i >= 0 ? u.slice(i + 1) : u;
+        }
+        w.addEventListener(
+          'error',
+          function (e) {
+            var t = e && e.target;
+            if (t && t !== w && t.nodeType === 1) {
+              fallar('no ha bajado ' + corto(t.src || t.href || t.tagName));
+              return;
+            }
+            var m = e && e.message ? String(e.message) : 'un error sin mensaje';
+            if (/ResizeObserver loop/.test(m)) return;
+            fallar(m + (e && e.filename ? ' (' + corto(e.filename) + ':' + e.lineno + ')' : ''));
+          },
+          true,
+        );
+        w.addEventListener('unhandledrejection', function (e) {
+          var r = e && e.reason;
+          fallar('promesa rechazada: ' + (r && r.message ? r.message : String(r)));
+        });
+
+        /* ─── El paquete, contado byte a byte ─── */
+        function mb(n) {
+          return (n / 1048576).toFixed(1).replace('.', ',');
+        }
+        function cargarElModulo(src) {
+          var s = document.createElement('script');
+          s.type = 'module';
+          s.crossOrigin = 'anonymous';
+          s.src = src;
+          document.head.appendChild(s);
+        }
+        function bajarUno(url, alAvance) {
+          return fetch(url, { credentials: 'same-origin' }).then(function (r) {
+            if (!r.ok) throw new Error('el servidor contestó ' + r.status + ' a ' + corto(url));
+            if (!r.body || typeof r.body.getReader !== 'function') {
+              return r.arrayBuffer().then(function (b) {
+                alAvance(b.byteLength);
+              });
+            }
+            var lector = r.body.getReader();
+            var n = 0;
+            function leer() {
+              return lector.read().then(function (x) {
+                if (x.done) return;
+                n += x.value.byteLength;
+                alAvance(n);
+                return leer();
+              });
+            }
+            return leer();
+          });
+        }
+        /*
+          Baja los trozos con `fetch` para CONTARLOS y luego carga la entrada como módulo: el navegador los
+          saca de su caché (`express.static` los sirve con ETag: como mucho un 304 por trozo, sin bytes). Si
+          un `fetch` falla no pasa nada: el módulo los pide él, y si tampoco puede, lo dice su `error`.
+        */
+        function bajar(p) {
+          var DESDE = 0.06;
+          var HASTA = 0.7;
+          var trozos = p && p.trozos ? p.trozos : [];
+          var total = 0;
+          var llevo = {};
+          for (var i = 0; i < trozos.length; i++) total += trozos[i][1];
+          avanzar(DESDE, 'codigo', 'el código del juego');
+          if (typeof fetch !== 'function' || total <= 0) {
+            cargarElModulo(p.entrada);
+            return;
+          }
+          var pendientes = [];
+          for (var j = 0; j < trozos.length; j++) {
+            (function (t) {
+              pendientes.push(
+                bajarUno(t[0], function (n) {
+                  llevo[t[0]] = Math.min(n, t[1]);
+                  var suma = 0;
+                  for (var k in llevo) suma += llevo[k];
+                  avanzar(DESDE + (HASTA - DESDE) * Math.min(1, suma / total), 'codigo', 'el código del juego (' + mb(suma) + ' de ' + mb(total) + ' MB)');
+                }).then(null, function () {
+                  return undefined;
+                }),
+              );
+            })(trozos[j]);
+          }
+          Promise.all(pendientes).then(function () {
+            avanzar(HASTA, 'codigo', 'el juego, arrancando');
+            cargarElModulo(p.entrada);
+          });
+        }
+
+        /* ─── Tres minutos sin poder jugar: se dice, y nada más ─── */
+        function avisar() {
+          if (esJugable || apartada) return;
+          avisoVisible = true;
+          pintar();
+        }
+        setTimeout(avisar, AVISO_MS);
+        function alLeerLaPagina() {
+          pintar();
+          var seguir = el('q-arranque-seguir');
+          var recargar = el('q-arranque-recargar');
+          if (seguir)
+            seguir.addEventListener('click', function () {
+              avisoVisible = false;
+              pintar();
+              setTimeout(avisar, AVISO_MS);
+            });
+          if (recargar)
+            recargar.addEventListener('click', function () {
+              location.reload();
+            });
+        }
+        if (typeof document !== 'undefined' && document.addEventListener) {
+          if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', alLeerLaPagina);
+          else alLeerLaPagina();
+        }
+
+        avanzar(0.03, 'pagina', 'la página');
+        mandar({ t: 'listo', v: V });
+        var conAnfitrion = nativo() !== null || enMarco;
+
+        w.quiebroArranque = {
+          dijoListo: conAnfitrion,
+          tomar: function () {
+            tomada = true;
+            w.removeEventListener('message', alMensaje);
+            var c = cola;
+            cola = [];
+            return c;
+          },
+          avanzar: avanzar,
+          jugable: jugable,
+          apartar: function () {
+            apartada = true;
+            pintar();
+          },
+          bajar: bajar,
+        };
+      })();
+    </script>
     <style>
       html,
       body {
@@ -72,9 +400,117 @@
         overscroll-behavior: none;
         touch-action: none;
       }
+      /* La barra del arranque: encima de todo hasta `jugable`, con la casa de El Quiebro (hud.css). */
+      #q-arranque {
+        position: fixed;
+        inset: 0;
+        z-index: 2147483000;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        padding: 16px max(16px, env(safe-area-inset-right, 0px)) 16px max(16px, env(safe-area-inset-left, 0px));
+        box-sizing: border-box;
+        background:
+          radial-gradient(ellipse at 50% 120%, rgba(255, 150, 50, 0.18), transparent 60%),
+          linear-gradient(180deg, #03100d, #020605);
+        color: #eef7f3;
+        font-family: 'Bahnschrift', 'DIN Alternate', 'Avenir Next Condensed', 'Roboto Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+        text-align: center;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      #q-arranque .q-arranque-nombre {
+        font-size: clamp(28px, 7vw, 60px);
+        letter-spacing: 0.3em;
+        margin-right: -0.3em;
+        text-transform: uppercase;
+        color: #ffe3f2;
+        text-shadow: 0 0 6px rgba(255, 63, 164, 0.9), 0 0 18px rgba(255, 63, 164, 0.6), 0 0 42px rgba(255, 63, 164, 0.35);
+      }
+      #q-arranque .q-arranque-carril {
+        width: min(420px, 72vw);
+        height: 6px;
+        border-radius: 3px;
+        background: rgba(63, 242, 194, 0.14);
+        box-shadow: inset 0 0 0 1px rgba(63, 242, 194, 0.28);
+        overflow: hidden;
+      }
+      #q-arranque-barra {
+        height: 100%;
+        width: 0;
+        background: #3ff2c2;
+        box-shadow: 0 0 12px rgba(63, 242, 194, 0.8);
+        transition: width 200ms linear;
+      }
+      #q-arranque-cifra {
+        font-family: 'Cascadia Mono', 'SF Mono', 'JetBrains Mono', 'Roboto Mono', Consolas, monospace;
+        font-size: 22px;
+        color: #3ff2c2;
+      }
+      #q-arranque-que {
+        font-size: 13px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: rgba(222, 240, 232, 0.62);
+        max-width: 90vw;
+      }
+      #q-arranque-fallo {
+        font-size: 13px;
+        color: #ff4d6d;
+        max-width: min(560px, 90vw);
+      }
+      #q-arranque-aviso {
+        max-width: min(560px, 90vw);
+        font-size: 15px;
+        line-height: 1.4;
+      }
+      #q-arranque-aviso .q-arranque-titulo {
+        font-size: 17px;
+        letter-spacing: 0.08em;
+        color: #ffd28a;
+      }
+      #q-arranque-aviso .q-arranque-botones {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
+      #q-arranque button {
+        appearance: none;
+        min-height: 44px;
+        border: 1px solid rgba(255, 171, 64, 0.55);
+        background: linear-gradient(180deg, rgba(255, 171, 64, 0.16), rgba(255, 171, 64, 0.06));
+        color: #ffd28a;
+        font: inherit;
+        font-size: 15px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        padding: 10px 18px;
+        border-radius: 3px;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
     </style>
   </head>
   <body>
+    <div id="q-arranque" role="progressbar" aria-label="Cargando El Quiebro" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+      <div class="q-arranque-nombre">El Quiebro</div>
+      <div class="q-arranque-carril"><div id="q-arranque-barra"></div></div>
+      <div id="q-arranque-cifra">0 %</div>
+      <div id="q-arranque-que">Cargando la página…</div>
+      <div id="q-arranque-fallo" style="display: none"></div>
+      <div id="q-arranque-aviso" style="display: none">
+        <div class="q-arranque-titulo">Está tardando más de lo normal…</div>
+        <div id="q-arranque-razon"></div>
+        <div class="q-arranque-botones">
+          <button type="button" id="q-arranque-seguir">Seguir esperando</button>
+          <button type="button" id="q-arranque-recargar">Recargar</button>
+        </div>
+      </div>
+    </div>
     <div id="raiz"></div>
     <script type="module" src="/src/quiebro/documento.tsx"></script>
   </body>

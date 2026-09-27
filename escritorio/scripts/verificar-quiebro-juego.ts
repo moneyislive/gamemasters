@@ -72,6 +72,7 @@
  * 1 rojo, 2 bloque saltado, 3 reventado), como hacen los demás comprobadores del Quiebro.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import '../../shared/arcade/juegos';
@@ -123,6 +124,8 @@ import { engancharElTeclado } from '../src/quiebro/mandos/teclado';
 import { enLaPreparacion, queMandarAlBajar, quienesFaltanEnLaBajada } from '../src/quiebro/hud/lectura';
 import { MenuDeLaNoche, Recuento, RotuloDeLaBajada } from '../src/quiebro/hud/Pantallas';
 import type { PuertoDeMesa } from '../src/quiebro/contrato';
+import { leerMensajeDelDocumento } from '../src/quiebro/contrato';
+import { FOTOGRAMAS_QUIETOS, SeguidorDeLaCarga } from '../src/quiebro/carga';
 import { anguloEntre, direccionHacia, elegirBlanco } from '../src/quiebro/mandos/enganche';
 import { camaraNueva, DISTANCIA_ABIERTA, DISTANCIA_AL_HOMBRO, encuadrar, FOV_PC, losaEnTresEjes } from '../src/quiebro/camara/encuadre';
 import type { CajaAlta } from '../src/quiebro/camara/encuadre';
@@ -4443,4 +4446,180 @@ paso('14. El rayo en los mandos: el gesto, el cable, el apuntado, la cámara, la
   );
 }
 
-terminar(274);
+/* ─────────────────────────────── 15. La carga: el arranque, la cola y el vigía ─────────────────────────────── */
+
+/*
+ * El 27-sep, en el teléfono de Miguel: «aparece el menú del Quiebro pero se cierra» a los 25 s. El documento
+ * decía `listo` con su paquete ya bajado y la app cortaba antes. Ahora lo dice el guion de arranque de
+ * `quiebro.html`, que guarda en una cola lo que mande el anfitrión hasta que el paquete monta. Aquí se CORRE
+ * ese guion —sacado del HTML tal cual— con una ventana de mentira, en el WebView y en un `iframe`, y se ve
+ * caer con guiones envenenados: sin `listo`, sin cola, aceptando de cualquier origen y callando los fallos.
+ */
+paso('15. La carga: el guion de arranque (listo, cola, carga, fallos), la toma de la cola y el vigía');
+{
+  const sinComentariosDe = (x: string): string => x.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const PROPIO = 'https://harkania.onrender.com';
+  const html = readFileSync(new URL('../quiebro.html', import.meta.url), 'utf8');
+  const guion = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1] ?? '').find((g) => g.includes('quiebroArranque')) ?? '';
+  comprobar('quiebro.html lleva su guion de arranque (clásico, dentro de la página, antes del paquete)', guion.length > 0 && html.indexOf(guion) < html.indexOf('/src/quiebro/documento.tsx'));
+
+  type Oyente = (e: unknown) => void;
+  type Leido = { t: string } & Record<string, unknown>;
+  interface Arranque {
+    dijoListo: boolean;
+    tomar(): { texto: unknown; origen: string | null }[];
+    avanzar(f: number, e: string, q: string): void;
+    jugable(): void;
+  }
+  /** Corre el guion y dice qué falla; `[]` si todo va como debe. */
+  const probarElGuion = (texto: string): string[] => {
+    const malos: string[] = [];
+    for (const modo of ['nativo', 'marco'] as const) {
+      const mandados: string[] = [];
+      const oyentes: Record<string, Oyente[]> = {};
+      const ventana: Record<string, unknown> = {
+        addEventListener: (t: string, f: Oyente) => (oyentes[t] ??= []).push(f),
+        removeEventListener: (t: string, f: Oyente) => {
+          oyentes[t] = (oyentes[t] ?? []).filter((x) => x !== f);
+        },
+      };
+      if (modo === 'nativo') {
+        ventana.ReactNativeWebView = { postMessage: (t: string) => mandados.push(t) };
+        ventana.parent = ventana;
+      } else {
+        ventana.parent = { postMessage: (t: string, destino: string) => (destino === PROPIO ? mandados.push(t) : undefined) };
+      }
+      try {
+        runInNewContext(texto, { window: ventana, location: { origin: PROPIO, search: '' }, setTimeout: () => 0, Date, JSON, String, Number, Math, Promise });
+      } catch (e) {
+        malos.push(`${modo}: el guion lanza (${e instanceof Error ? e.message : String(e)})`);
+        continue;
+      }
+      const leidos = (): Leido[] => mandados.map((m) => leerMensajeDelDocumento(m) as Leido | null).filter((m): m is Leido => m !== null);
+      if (mandados.length !== leidos().length) malos.push(`${modo}: manda algo que el lector del contrato no lee`);
+      const primeros = leidos().map((m) => m.t);
+      if (primeros[0] !== 'carga' || primeros[1] !== 'listo') malos.push(`${modo}: no dice «carga» y luego «listo» al leer la página (${primeros.join(',')})`);
+      const a = ventana.quiebroArranque as Arranque | undefined;
+      if (a === undefined || typeof a.tomar !== 'function') {
+        malos.push(`${modo}: no deja window.quiebroArranque`);
+        continue;
+      }
+      if (a.dijoListo !== true) malos.push(`${modo}: no se apunta que ya dijo listo`);
+      /* LA COLA: lo que llega antes de montar se guarda, en orden y con su origen; lo ajeno, no. */
+      const entrega = ventana.quiebroDelAnfitrion as ((t: string) => void) | undefined;
+      if (modo === 'nativo') {
+        entrega?.('mesa-1');
+        entrega?.('mesa-2');
+      } else {
+        for (const f of oyentes.message ?? []) {
+          f({ origin: PROPIO, data: 'mesa-1' });
+          f({ origin: 'https://atacante.example', data: 'trampa' });
+          f({ origin: `${PROPIO}.trampa.net`, data: 'trampa' });
+          f({ origin: PROPIO, data: 'mesa-2' });
+        }
+      }
+      const cola = a.tomar();
+      const origen = modo === 'nativo' ? null : PROPIO;
+      const esperada = [
+        { texto: 'mesa-1', origen },
+        { texto: 'mesa-2', origen },
+      ];
+      if (JSON.stringify(cola) !== JSON.stringify(esperada)) malos.push(`${modo}: la cola no guarda lo del anfitrión, en orden y sólo lo suyo (${JSON.stringify(cola)})`);
+      entrega?.('tarde');
+      for (const f of oyentes.message ?? []) f({ origin: PROPIO, data: 'tarde' });
+      if (a.tomar().length !== 0) malos.push(`${modo}: después de tomarla sigue guardando (lo de después es del paquete)`);
+      /* LA CARGA: nunca hacia atrás, y nada después de jugable. */
+      a.avanzar(0.5, 'codigo', 'el código');
+      a.avanzar(0.2, 'codigo', 'el código');
+      a.avanzar(0.8, 'personajes', 'los personajes');
+      const fracciones = leidos()
+        .filter((m) => m.t === 'carga')
+        .map((m) => m.fraccion as number);
+      if (fracciones.some((f, i) => i > 0 && f < (fracciones[i - 1] as number)) || fracciones[fracciones.length - 1] !== 0.8) malos.push(`${modo}: la carga va hacia atrás o no llega (${fracciones.join(',')})`);
+      /* LOS FALLOS al arrancar se dicen; después de jugable, ya no. */
+      for (const f of oyentes.error ?? []) f({ message: 'TypeError: boom', filename: `${PROPIO}/sala/assets/Quiebro-H.js`, lineno: 3 });
+      for (const f of oyentes.unhandledrejection ?? []) f({ reason: new Error('sin red') });
+      const fallos = leidos()
+        .filter((m) => m.t === 'fallo')
+        .map((m) => String(m.motivo));
+      if (fallos.length !== 2 || !(fallos[0] ?? '').includes('TypeError: boom (Quiebro-H.js:3)') || !(fallos[1] ?? '').includes('sin red')) malos.push(`${modo}: los fallos al arrancar no se dicen (${fallos.join(' | ')})`);
+      a.jugable();
+      const antes = mandados.length;
+      a.avanzar(0.9, 'graficos', 'x');
+      for (const f of oyentes.error ?? []) f({ message: 'otro' });
+      if (leidos()[antes - 1]?.t !== 'jugable' || mandados.length !== antes) malos.push(`${modo}: tras «jugable» sigue hablando`);
+    }
+    return malos;
+  };
+  const bien = probarElGuion(guion);
+  comprobar('el guion de arranque, en el WebView y en un iframe: carga y listo al leer la página, la cola del anfitrión, la carga que no retrocede y los fallos', bien.length === 0, bien);
+  const ENVENENADOS: readonly [string, string][] = [
+    ['sin el `listo` del guion', guion.replace("mandar({ t: 'listo', v: V });", '')],
+    ['sin cola: lo que entrega el WebView antes de montar se pierde', guion.replace('guardar(texto, null);', '')],
+    ['aceptando mensajes de cualquier origen', guion.replace('if (!delAnfitrion(e.origin)) return;', '')],
+    ['sin los fallos al arrancar', guion.replace("mandar({ t: 'fallo', v: V, motivo: motivo });", '')],
+  ];
+  for (const [que, texto] of ENVENENADOS) {
+    comprobar(`y se ve CAER con el guion envenenado «${que}»`, texto !== guion && probarElGuion(texto).length > 0, texto === guion ? 'el envenenado no ha cambiado el guion' : probarElGuion(texto));
+  }
+  comprobar(
+    'el guion no se rinde por tiempo: su único temporizador (tres minutos, y otra vez tras «seguir esperando») sólo enseña el aviso',
+    /var AVISO_MS = 180000;/.test(guion) &&
+      (guion.match(/setTimeout\(/g) ?? []).length === 2 &&
+      (guion.match(/setTimeout\(avisar, AVISO_MS\)/g) ?? []).length === 2 &&
+      /function avisar\(\) \{\s*if \(esJugable \|\| apartada\) return;\s*avisoVisible = true;\s*pintar\(\);\s*\}/.test(guion),
+  );
+
+  /* LA TOMA: `ConAnfitrion` pone sus entradas, toma la cola en el mismo turno, y sólo dice listo si el guion no pudo. */
+  const doc = sinComentariosDe(readFileSync(new URL('../src/quiebro/documento.tsx', import.meta.url), 'utf8'));
+  const tomaBien = (t: string): boolean =>
+    /ventana\.quiebroDelAnfitrion = \(texto: string\) => atender\(texto\);\s*for \(const g of ARRANQUE\?\.tomar\(\) \?\? \[\]\) \{/.test(t) &&
+    /vieneDelAnfitrion\(g\.origen, location\.origin, anfitrionesFijados\(\)\)/.test(t) &&
+    /if \(ARRANQUE\?\.dijoListo !== true\) mandar\(\{ t: 'listo', v: VERSION_DEL_PUENTE \}\);/.test(t) &&
+    (t.match(/alPreparar=\{avanzar\}/g) ?? []).length === 2 &&
+    (t.match(/alJugable=\{yaSePuedeJugar\}/g) ?? []).length === 2;
+  comprobar('el documento toma la cola al montar (tras poner sus entradas), filtra su origen, no repite `listo` y le pasa la carga al juego en los dos modos', tomaBien(doc));
+  comprobar('y se ve CAER sin la toma de la cola', !tomaBien(doc.replace('for (const g of ARRANQUE?.tomar() ?? []) {', 'for (const g of [] as { origen: string | null; texto: unknown }[]) {')));
+  comprobar('y se ve CAER diciendo `listo` siempre', !tomaBien(doc.replace('if (ARRANQUE?.dijoListo !== true) mandar(', 'mandar(')));
+  const elJuego = sinComentariosDe(readFileSync(new URL('../src/quiebro/Quiebro.tsx', import.meta.url), 'utf8'));
+  comprobar(
+    'el juego monta el vigía de la carga dentro del lienzo cuando su anfitrión la quiere',
+    /\{alPreparar !== undefined && alJugable !== undefined \? <VigiaDeLaCarga alPreparar=\{alPreparar\} alJugable=\{alJugable\} \/> : null\}\s*<\/Canvas>/.test(elJuego),
+  );
+
+  /* EL VIGÍA: jugable sólo con nada bajando ni compilándose FOTOGRAMAS_QUIETOS fotogramas seguidos. */
+  const s = new SeguidorDeLaCarga();
+  const nada = { bajando: false, bajados: 0, total: 0, compilando: false };
+  const bajando = s.paso({ bajando: true, bajados: 1, total: 4, compilando: false });
+  const compilando = s.paso({ ...nada, compilando: true });
+  const pasos: unknown[] = [];
+  for (let i = 0; i < FOTOGRAMAS_QUIETOS - 1; i++) pasos.push(s.paso(nada));
+  const interrumpido = s.paso({ bajando: true, bajados: 3, total: 4, compilando: false });
+  const trasCortar: unknown[] = [];
+  for (let i = 0; i < FOTOGRAMAS_QUIETOS; i++) trasCortar.push(s.paso(nada));
+  comprobar(
+    'el vigía: los personajes cuentan lo bajado, compilar es «los gráficos», y `jugable` sale una sola vez tras la racha quieta entera (lo que corta la racha la vuelve a empezar)',
+    bajando !== null &&
+      bajando !== 'jugable' &&
+      bajando.etapa === 'personajes' &&
+      Math.abs(bajando.fraccion - 0.8) < 1e-9 &&
+      compilando !== null &&
+      compilando !== 'jugable' &&
+      compilando.etapa === 'graficos' &&
+      /* Los tramos se suman: compilar no adelanta la barra por encima de lo que falta de los personajes. */
+      Math.abs(compilando.fraccion - 0.79) < 1e-9 &&
+      interrumpido !== null &&
+      interrumpido !== 'jugable' &&
+      interrumpido.fraccion > compilando.fraccion &&
+      !pasos.includes('jugable') &&
+      interrumpido !== null &&
+      interrumpido !== 'jugable' &&
+      interrumpido.etapa === 'personajes' &&
+      trasCortar.filter((p) => p === 'jugable').length === 1 &&
+      trasCortar[trasCortar.length - 1] === 'jugable' &&
+      s.paso(nada) === null,
+    { bajando, compilando, trasCortar: trasCortar.slice(-2) },
+  );
+}
+
+terminar(286);

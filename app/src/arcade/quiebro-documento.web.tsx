@@ -25,8 +25,10 @@
  * ═══ LO QUE UN `iframe` NO DICE, Y QUIÉN LO VIGILA ═══
  *
  * Un `iframe` no avisa de un 404 ni de un documento que revienta al arrancar: `onError` no salta por el
- * código HTTP de otra página. Lo que sí se sabe es si el documento se ha puesto en marcha —dice `listo`—,
- * y esa espera la lleva la pantalla, igual para las dos plataformas. Aquí sólo se pinta y se reparte.
+ * código HTTP de otra página. Lo que sí se sabe es lo que el documento cuenta —`listo` al leer su página,
+ * su `carga`, `jugable`, y un `fallo` si algo revienta al arrancar—, y eso lo lleva la pantalla, igual
+ * para las dos plataformas, sin plazo que tire al plano. Aquí sólo se pinta, se reparte y se dice cuándo
+ * acabó de cargar la página (`onLoad`: el `iframe` no cuenta por dónde va).
  *
  * `allow` delega en el documento lo que un juego necesita y un `iframe` no tiene por defecto: sonar sin
  * pedir otro toque, la pantalla completa y el mando de consola.
@@ -36,7 +38,7 @@ import { StyleSheet, View } from 'react-native';
 import type { LoQueVeElDocumento } from './quiebro-documento';
 import { SALA } from './muebles';
 
-export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon }: LoQueVeElDocumento): JSX.Element {
+export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon, alProgresarLaPagina }: LoQueVeElDocumento): JSX.Element {
   const marco = useRef<HTMLIFrameElement | null>(null);
 
   useEffect(() => {
@@ -62,6 +64,7 @@ export function ElDocumentoDelQuiebro({ direccion, origen, alRecibir, buzon }: L
         src={direccion}
         title="El Quiebro"
         allow="autoplay; fullscreen; gamepad"
+        onLoad={() => alProgresarLaPagina(1)}
         style={{ border: 0, width: '100%', height: '100%', display: 'block', background: SALA.suelo }}
       />
     </View>

@@ -26,13 +26,26 @@
  *     "antes": "código JS (async) que se ejecuta tras cargar: pulsar «Al hombro», etc.",
  *     "despuesMs": 3000,                              // cuánto esperar tras `antes`
  *     "perfil": "C:/…/scratchpad/edge-yo",            // un perfil por agente: dos con el mismo se pisan
- *     "puerto": 9333                                   // el de depuración; uno por agente
+ *     "puerto": 9333,                                  // el de depuración; uno por agente
+ *     "red": { "kbps": 1500, "latenciaMs": 300 },      // OPCIONAL: una red lenta (la de un móvil con datos)
+ *     "fotosEnMs": [3000, 10000, 20000],               // OPCIONAL: fotos a esos instantes tras navegar
+ *     "leerEnCadaFoto": "document.title",              // OPCIONAL: una expresión que se apunta con cada una
+ *     "bloquear": ["*Quiebro-*.js"]                    // OPCIONAL: direcciones que no llegan (ver un fallo)
  *   }
  *
  * Por cada tamaño deja `<tamaño>.png` y, en `informe.json`, lo medido en la página: el viewport que
  * de verdad vio (si no coincide con el pedido, la foto no vale), los elementos tocables o fijos que
  * se salen de la pantalla, los que se pisan entre sí, los botones de menos de 44 px en un móvil y
  * los textos cortados. Es una pista para mirar la foto, no un veredicto: la foto se mira con Read.
+ *
+ * ═══ LA CARGA, A CÁMARA LENTA (`red` y `fotosEnMs`) ═══
+ *
+ * Para ver una pantalla MIENTRAS carga —la barra de El Quiebro, 27-sep— la red se estrangula con
+ * `Network.emulateNetworkConditions` (bajada y subida en kbit/s, más la latencia) y, en vez de una foto
+ * tras `esperaMs`, se hace una a cada instante de `fotosEnMs` contado desde que se navega:
+ * `<tamaño>-<ms>ms.png`, con lo que diga `leerEnCadaFoto` en el informe. Con `fotosEnMs` no se espera
+ * `esperaMs`: la última foto marca cuándo se sigue con `antes` y la medida. La caché fría se consigue con
+ * un `perfil` NUEVO, no apagando la caché: hay páginas que bajan algo dos veces contando con ella.
  */
 import { spawn } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
@@ -210,8 +223,43 @@ async function main() {
           .join('');
         await cdp.mandar('Page.addScriptToEvaluateOnNewDocument', { source: `if (location.origin === ${JSON.stringify(origen)}) { try { ${dentro} } catch (e) {} }` }, s);
       }
+      /* OPCIONAL: direcciones que no llegan nunca (`"bloquear": ["*Quiebro-*.js"]`), para ver cómo se dice un fallo. */
+      if (Array.isArray(plan.bloquear) && plan.bloquear.length > 0) {
+        await cdp.mandar('Network.enable', {}, s);
+        await cdp.mandar('Network.setBlockedURLs', { urls: plan.bloquear }, s);
+      }
+      if (plan.red) {
+        const bytesPorSegundo = (kbps) => Math.round((kbps * 1000) / 8);
+        await cdp.mandar('Network.enable', {}, s);
+        await cdp.mandar(
+          'Network.emulateNetworkConditions',
+          {
+            offline: false,
+            latency: plan.red.latenciaMs ?? 0,
+            downloadThroughput: bytesPorSegundo(plan.red.kbps),
+            uploadThroughput: bytesPorSegundo(plan.red.subidaKbps ?? plan.red.kbps),
+          },
+          s,
+        );
+      }
       await cdp.mandar('Page.navigate', { url: plan.url }, s);
-      await esperar(plan.esperaMs ?? 10000);
+      const fotosDeLaCarga = [];
+      if (Array.isArray(plan.fotosEnMs) && plan.fotosEnMs.length > 0) {
+        const desde = Date.now();
+        for (const ms of plan.fotosEnMs) {
+          await esperar(Math.max(0, ms - (Date.now() - desde)));
+          const f = await cdp.mandar('Page.captureScreenshot', { format: 'png', captureBeyondViewport: false }, s);
+          const archivo = path.join(plan.salida, `${t}-${ms}ms.png`);
+          writeFileSync(archivo, Buffer.from(f.data, 'base64'));
+          let leido = null;
+          if (plan.leerEnCadaFoto) {
+            const r = await cdp.mandar('Runtime.evaluate', { expression: plan.leerEnCadaFoto, awaitPromise: true, returnByValue: true }, s);
+            leido = r.exceptionDetails ? `FALLÓ: ${r.exceptionDetails.exception?.description ?? r.exceptionDetails.text}` : r.result.value ?? null;
+          }
+          fotosDeLaCarga.push({ ms, foto: archivo, leido });
+          console.log(`${t.padEnd(16)} ${String(ms).padStart(6)} ms · ${archivo}${leido === null ? '' : ' · ' + JSON.stringify(leido).slice(0, 160)}`);
+        }
+      } else await esperar(plan.esperaMs ?? 10000);
       let antes = null;
       if (plan.antes) {
         const r = await cdp.mandar('Runtime.evaluate', { expression: `(async () => { ${plan.antes} })()`, awaitPromise: true, returnByValue: true }, s);
@@ -223,7 +271,15 @@ async function main() {
       const archivo = path.join(plan.salida, `${t}.png`);
       writeFileSync(archivo, Buffer.from(foto.data, 'base64'));
       const cuadra = medido.viewport.ancho === a.ancho && medido.viewport.alto === a.alto;
-      informe.aparatos[t] = { pedido: `${a.ancho}x${a.alto}`, cuadra, foto: archivo, antes, errores: errores.slice(0, 10), ...medido };
+      informe.aparatos[t] = {
+        pedido: `${a.ancho}x${a.alto}`,
+        cuadra,
+        foto: archivo,
+        antes,
+        errores: errores.slice(0, 10),
+        ...(fotosDeLaCarga.length > 0 ? { fotosDeLaCarga } : {}),
+        ...medido,
+      };
       console.log(
         `${t.padEnd(16)} ${cuadra ? 'ok' : 'VIEWPORT NO CUADRA'} ${medido.viewport.ancho}x${medido.viewport.alto} · fuera ${medido.fuera.length} · pisados ${medido.pisados.length} · chicos ${medido.chicos.length} · cortados ${medido.cortados.length} · errores ${errores.length}${antes ? ' · antes: ' + JSON.stringify(antes).slice(0, 80) : ''}`,
       );

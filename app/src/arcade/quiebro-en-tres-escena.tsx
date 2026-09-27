@@ -40,13 +40,21 @@
  * para que se pueda comprobar en Node contra el lector del contrato. Ahí está también por qué este lado
  * del puente no se importa del contrato mismo.
  *
- * ═══ SI EL DOCUMENTO NO CONTESTA, SE JUEGA IGUAL ═══
+ * ═══ MIENTRAS CARGA, UNA BARRA; Y NINGÚN PLAZO QUE TIRE AL PLANO ═══
  *
- * Un `iframe` no avisa de un 404 y un WebView no avisa de un documento que revienta al arrancar. Lo que
- * sí se sabe es si dice `listo`, así que se le dan `ESPERA_DEL_DOCUMENTO_MS`; si no lo dice, se juega
- * sobre el plano del barrio con la nota de por qué, y un botón vuelve a intentarlo. Lo mismo si la
- * superficie falla (`alFallar`) o si algo revienta al pintarla (`RedDelLienzo`, que además lo apunta en
- * el parte).
+ * Hasta el 27-sep se le daban 25 s al documento para decir `listo`, y si no, al plano. En el teléfono de
+ * Miguel, con datos móviles, el menú aparecía justo cuando la app cortaba. Ahora el documento dice `listo`
+ * al leer su página (su guion de arranque guarda la mesa en una cola hasta que el juego monta), cuenta su
+ * carga y avisa con `jugable`; encima de la superficie va `LaCargaDeLaNoche` con el porcentaje y qué se
+ * está cargando, hasta ese `jugable`. No hay corte por tiempo: a los `AVISO_DE_TARDANZA_MS` (3 min) sin
+ * poder jugar se dice, con la razón probable, y quien juega elige seguir esperando, reintentar o el plano.
+ * Si el documento dice que algo ha FALLADO al arrancar (`fallo`), se enseña en el acto con las mismas
+ * salidas: si en un teléfono la causa es otra que la lentitud, se ve.
+ *
+ * Al plano sin preguntar sólo se cae por fallos de verdad: la superficie que no carga o el servidor que
+ * contesta un error (`alFallar`), el motor del navegador que se cierra, un puente de otra versión
+ * (`versionAjenaDelDocumento`) o algo que revienta al pintarla (`RedDelLienzo`, que además lo apunta en
+ * el parte). Un botón vuelve a intentarlo.
  *
  * ═══ SALIR DE LA NOCHE NO ES LEVANTARSE ═══
  *
@@ -54,7 +62,7 @@
  * la mesa de siempre —la barra con el código, «Salir» y «Tirar», el plano, lo que se puede hacer y la
  * crónica— con «Volver a la noche» debajo de la barra. El asiento sigue, y la noche sigue para los demás.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { BackHandler, Pressable, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
@@ -71,16 +79,27 @@ import { guardarElVeredicto } from './mesa';
 import { BOTON, LETRA, RADIO, SALA } from './muebles';
 import { ElRespaldo, LaMesaDeUnPintor, RedDelLienzo } from './pintor-propio';
 import type { LoQueVeElPintor } from './pintor-propio';
+import { LaCargaDeLaNoche } from './quiebro-carga';
 import { ElDocumentoDelQuiebro } from './quiebro-documento';
 import {
+  AVISO_DE_TARDANZA_MS,
+  CARGA_INICIAL,
+  cargaTras,
   direccionDelDocumento,
-  ESPERA_DEL_DOCUMENTO_MS,
   leerLoQueDiceElDocumento,
   mesaParaElDocumento,
   origenDe,
+  razonProbable,
   textoParaElDocumento,
+  versionAjenaDelDocumento,
   VERSION_DEL_PUENTE,
 } from './quiebro-puente';
+import type { CargaDeLaNoche, SucesoDeLaCarga } from './quiebro-puente';
+
+/** La carga, con la vuelta al principio de cada superficie nueva. */
+function conLaCarga(c: CargaDeLaNoche, s: SucesoDeLaCarga | { readonly t: 'de-nuevo' }): CargaDeLaNoche {
+  return s.t === 'de-nuevo' ? CARGA_INICIAL : cargaTras(c, s);
+}
 
 // ---------------------------------------------------------------------------
 // El teléfono, mientras dura la noche
@@ -251,23 +270,42 @@ function LaNocheEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
     if (direccion === null) ponerCayo(`el servidor de la app no es una dirección web (${servidorActual()})`);
   }, [direccion]);
 
-  /* La espera del `listo`, por superficie. */
+  /*
+   * LA CARGA, por superficie: cada una empieza de cero y no ha dicho nada (`listo` vuelve a falso). SIN
+   * PLAZO: el temporizador de abajo sólo AVISA a los tres minutos (y otra vez tres minutos después de cada
+   * «seguir esperando»); no hay ninguno que lleve al plano. Ver la cabecera.
+   */
+  const [carga, despachar] = useReducer(conLaCarga, CARGA_INICIAL);
   useEffect(() => {
-    if (!jugando || direccion === null) return undefined;
     listo.current = false;
-    const reloj = setTimeout(() => {
-      if (!listo.current) ponerCayo(`el documento de la noche no se ha puesto en marcha en ${String(ESPERA_DEL_DOCUMENTO_MS / 1000)} s`);
-    }, ESPERA_DEL_DOCUMENTO_MS);
+    despachar({ t: 'de-nuevo' });
+  }, [intento]);
+  const yaJugable = carga.jugable;
+  const esperas = carga.esperas;
+  useEffect(() => {
+    if (!jugando || direccion === null || yaJugable) return undefined;
+    const reloj = setTimeout(() => despachar({ t: 'tardanza' }), AVISO_DE_TARDANZA_MS);
     return () => clearTimeout(reloj);
-  }, [direccion, jugando, intento]);
+  }, [direccion, jugando, intento, esperas, yaJugable]);
 
   const alRecibir = useCallback(
     (dato: unknown) => {
+      const ajena = versionAjenaDelDocumento(dato);
+      if (ajena !== null) {
+        ponerCayo(`el documento habla la versión ${String(ajena)} del puente y esta app la ${String(VERSION_DEL_PUENTE)}; hace falta actualizar la app`);
+        return;
+      }
       const m = leerLoQueDiceElDocumento(dato);
       if (m === null) return;
       switch (m.t) {
+        case 'carga':
+        case 'jugable':
+        case 'fallo':
+          despachar({ t: 'documento', m });
+          return;
         case 'listo':
           listo.current = true;
+          despachar({ t: 'documento', m });
           mandarLaMesa();
           return;
         case 'salir':
@@ -296,6 +334,12 @@ function LaNocheEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
     [mandarLaMesa],
   );
   const alFallar = useCallback((motivo: string) => ponerCayo(motivo), []);
+  const alProgresarLaPagina = useCallback((fraccion: number) => despachar({ t: 'pagina', fraccion }), []);
+  const volverAIntentarlo = useCallback(() => {
+    ponerCayo(null);
+    ponerEnLaNoche(true);
+    ponerIntento((n) => n + 1);
+  }, []);
 
   /**
    * La barra de la mesa con un botón debajo: volver a la noche. La barra llega hecha del contrato y se
@@ -308,11 +352,7 @@ function LaNocheEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
         {laBarra}
         <Pressable
           style={estilos.volver}
-          onPress={() => {
-            ponerCayo(null);
-            ponerEnLaNoche(true);
-            ponerIntento((n) => n + 1);
-          }}
+          onPress={volverAIntentarlo}
           accessibilityRole="button"
           accessibilityLabel={rotulo}
           accessibilityHint={ayuda}
@@ -353,8 +393,17 @@ function LaNocheEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
             alRecibir={alRecibir}
             buzon={buzon}
             alFallar={alFallar}
+            alProgresarLaPagina={alProgresarLaPagina}
           />
         </RedDelLienzo>
+      )}
+      {carga.jugable ? null : (
+        <LaCargaDeLaNoche
+          carga={carga}
+          alSeguir={() => despachar({ t: 'seguir' })}
+          alReintentar={volverAIntentarlo}
+          alPlano={() => ponerCayo(`la has dejado mientras cargaba: ${razonProbable(carga)}`)}
+        />
       )}
     </View>
   );

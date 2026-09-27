@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 import type { Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -82,9 +82,76 @@ function laSalaComoEnProduccion(): Plugin {
  */
 const ARBOL_DEL_QUIEBRO = fileURLToPath(new URL('..', import.meta.url)).replace(/\\/g, '/').replace(/\/$/, '');
 
+/**
+ * ═══ EL ARRANQUE DE `quiebro.html`: LOS ANFITRIONES FIJADOS Y EL PAQUETE CONTADO ═══
+ *
+ * El documento suelto lleva DENTRO un guion de arranque (ver su cabecera y `DONDE_ARRANCA` en
+ * `src/quiebro/contrato.ts`) que dice `listo`, guarda la mesa en una cola y enseña la barra de carga antes
+ * de que baje el juego. Este complemento le da dos cosas que sólo se saben al compilar:
+ *
+ *   · LOS ANFITRIONES FIJADOS, en el hueco `[/*ANFITRIONES_FIJADOS*\/]` del guion: los mismos que lee
+ *     `documento.tsx` —`VITE_QUIEBRO_ANFITRIONES` y, al servir en desarrollo, la app web del 8131—. Del
+ *     `.env` y de esta orden, nunca de un mensaje ni de la dirección.
+ *   · EN EL EMPAQUETADO, EL PAQUETE CONTADO. Vite escribe la entrada como `<script type="module">` y sus
+ *     trozos como `modulepreload`: el navegador los baja sin decir cuánto lleva, y en un teléfono con datos
+ *     son 2,5 MB de pantalla negra. Aquí se quitan esas etiquetas y, al final del cuerpo, se llama a
+ *     `quiebroArranque.bajar({entrada, trozos: [[dirección, bytes]…]})`, que los baja contando y luego
+ *     carga la entrada (de la caché). Si el arranque no estuviera, esa misma llamada carga la entrada como
+ *     antes: un guion roto no deja el documento sin juego. La hoja de estilo se queda donde la puso Vite.
+ *
+ * Sólo toca `quiebro.html`: la Sala (`index.html`) sale igual que siempre.
+ */
+function elArranqueDelQuiebro(): Plugin {
+  let fijados: string[] = [];
+  let base = '/';
+  return {
+    name: 'el-arranque-del-quiebro',
+    configResolved(c) {
+      base = c.base;
+      const env = loadEnv(c.mode, c.envDir, 'VITE_');
+      fijados = String(env.VITE_QUIEBRO_ANFITRIONES ?? process.env.VITE_QUIEBRO_ANFITRIONES ?? '')
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => /^https?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?$/.test(s));
+      if (c.command === 'serve') fijados.push('http://localhost:8131');
+    },
+    transformIndexHtml: {
+      order: 'post',
+      handler(html, ctx) {
+        if (!/quiebro\.html$/.test(ctx.filename.replace(/\\/g, '/'))) return html;
+        const hueco = '/*ANFITRIONES_FIJADOS*/';
+        if (!html.includes(hueco)) throw new Error('quiebro.html: falta el hueco de los anfitriones fijados en el guion de arranque');
+        let salida = html.replace(hueco, fijados.map((f) => JSON.stringify(f)).join(','));
+        const paquete = ctx.bundle;
+        if (paquete === undefined) return salida;
+        const bytesDe = (url: string): number => {
+          const nombre = url.startsWith(base) ? url.slice(base.length) : url.replace(/^\//, '');
+          const pieza = paquete[nombre];
+          if (pieza === undefined) throw new Error(`quiebro.html: el trozo ${url} no está en el paquete`);
+          return Buffer.byteLength(pieza.type === 'chunk' ? pieza.code : typeof pieza.source === 'string' ? pieza.source : Buffer.from(pieza.source));
+        };
+        const entrada = /<script type="module" crossorigin src="([^"]+)"><\/script>\s*/.exec(salida);
+        if (entrada === null) throw new Error('quiebro.html: no encuentro la entrada del paquete que escribe Vite');
+        const direccionDeEntrada = entrada[1] as string;
+        salida = salida.replace(entrada[0], '');
+        const trozos: [string, number][] = [[direccionDeEntrada, bytesDe(direccionDeEntrada)]];
+        salida = salida.replace(/<link rel="modulepreload" crossorigin href="([^"]+)">\s*/g, (_todo, url: string) => {
+          trozos.push([url, bytesDe(url)]);
+          return '';
+        });
+        const plan = JSON.stringify({ entrada: direccionDeEntrada, trozos });
+        const llamada =
+          `<script>(function(p){var a=window.quiebroArranque;if(a&&typeof a.bajar==='function'){a.bajar(p);return;}` +
+          `var s=document.createElement('script');s.type='module';s.crossOrigin='anonymous';s.src=p.entrada;document.head.appendChild(s);})(${plan});</script>\n`;
+        return salida.replace('</body>', `${llamada}  </body>`);
+      },
+    },
+  };
+}
+
 export default defineConfig({
   base: '/sala/',
-  plugins: [react(), laSalaComoEnProduccion()],
+  plugins: [react(), laSalaComoEnProduccion(), elArranqueDelQuiebro()],
   define: { __ARBOL_DEL_QUIEBRO__: JSON.stringify(ARBOL_DEL_QUIEBRO) },
   /*
    * ═══ UNA SOLA COPIA DE R3F, DE `three` Y DE `react`, AUNQUE HAYA VARIAS EN EL DISCO ═══

@@ -841,7 +841,7 @@ Tiene **ruta propia**: `/api/arcade/mesas/:codigo/liza`. No toca el canal v1, ni
 - **Tutorial** en la primera noche del aparato (§2.1).
 - **Mandos** de móvil y PC. **Niveles** N0-N2 automáticos (N3 = N2 con más densidad). **Sonido** base (§9).
 - **Clientes, el mismo día:**
-  - app: un WebView apaisado que carga el paquete web y recibe código, llave y servidor **por postMessage, nunca en la URL**;
+  - app: un WebView apaisado que carga el paquete web y recibe código, llave y servidor **por postMessage, nunca en la URL**. **Mientras carga, una barra y ningún plazo** (27-sep, tras caer al plano a los 25 s en un teléfono con datos): el documento dice `listo` desde un guion dentro de `quiebro.html` que guarda la mesa en una cola hasta que el juego monta, cuenta su carga (`carga`: página, código byte a byte, mesa, ciudad, personajes, gráficos) y avisa con `jugable`; la app pinta la barra encima hasta entonces y, a los 3 minutos, dice que tarda más de lo normal con la razón probable (seguir esperando, reintentar o jugar sobre el plano). Un error de JavaScript al arrancar llega como `fallo` y se enseña. Al plano sin preguntar sólo se cae por fallos de verdad (la página no carga, un error HTTP, el motor del navegador cerrado o un puente de otra versión);
   - /jugar en el iPhone;
   - escritorio con mueble `tablero`, pintor propio y el plano como respaldo.
 - **Lobby:** el vestíbulo común con tema propio.

@@ -53,7 +53,8 @@ import { leerVistaDelQuiebro } from '../../../shared/arcade/juegos/quiebro-vista
 import type { VistaDelQuiebro } from '../../../shared/arcade/juegos/quiebro-vista';
 import type { LizaDeclarada } from '../../../shared/mecanicas/liza/declaracion';
 import { UNO } from '../../../shared/mecanicas/fijo';
-import type { PuertoDeMesa, SalidaDelMovimiento } from './contrato';
+import type { EtapaDeLaCarga, PuertoDeMesa, SalidaDelMovimiento } from './contrato';
+import { VigiaDeLaCarga } from './carga';
 import { LaCiudadDeNoche } from './ciudad/LaCiudadDeNoche';
 import { EfectosDelQuiebro, crearRelojDePresentacion, crearSistemaDeEfectos } from './efectos';
 import type { SistemaDeEfectos } from './efectos';
@@ -96,6 +97,13 @@ export interface PropsDelQuiebro {
   readonly alMedir?: (nivel: 0 | 1 | 2 | 3, calidad: 'sobria' | 'plena') => void;
   /** Sólo en el modo de prueba: la dirección con que otra pestaña se sienta en esta mesa (la reunión la enseña). */
   readonly enlaceParaEntrar?: string;
+  /**
+   * LA CARGA, para la barra del documento suelto y de su anfitrión (`carga.tsx`): cuánto falta y de qué. Sin
+   * él (el pintor del escritorio) no se mira nada.
+   */
+  readonly alPreparar?: (fraccion: number, etapa: EtapaDeLaCarga, que: string) => void;
+  /** Ya se puede jugar: bajado, compilado y quieto (`carga.tsx`). Una vez por montaje. */
+  readonly alJugable?: () => void;
 }
 
 /* ═══ LOS PERSONAJES, SI YA ESTÁN ═══
@@ -183,7 +191,7 @@ const RELOJES_DEL_NAVEGADOR = {
   azar: () => Math.random(),
 };
 
-export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enlaceParaEntrar }: PropsDelQuiebro): JSX.Element {
+export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enlaceParaEntrar, alPreparar, alJugable }: PropsDelQuiebro): JSX.Element {
   /* ─── La mesa ─── */
   const [rev, ponerRev] = useState(0);
   useEffect(() => puerto.suscribir(() => ponerRev((r) => (r + 1) % 1_000_000)), [puerto]);
@@ -451,6 +459,7 @@ export function Quiebro({ puerto, incrustado, alSalir, alOtraMesa, alMedir, enla
             tactil={tactil}
             alNivel={alNivel}
           />
+          {alPreparar !== undefined && alJugable !== undefined ? <VigiaDeLaCarga alPreparar={alPreparar} alJugable={alJugable} /> : null}
         </Canvas>
       </div>
       <div className={enLaCiudad && bajado && (fase === 'oleada' || fase === 'llamada' || fase === 'pausa') ? 'quiebro-hud q-con-minimapa' : 'quiebro-hud'}>
