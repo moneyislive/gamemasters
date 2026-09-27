@@ -166,6 +166,7 @@ import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos'
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
 import { LaForja, opcionesFueraDeLaForja, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { PantallaCompleta } from './pantalla-completa';
+import { usarAPieApaisado } from './a-pie-apaisado';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
@@ -1860,6 +1861,8 @@ export function RiberasEnTres({
    * material, que la escena cuenta por `alRecoger` (`a-pie-en-botas.tsx`). La forja va en el cajón.
    */
   const tactil = usarAparatoTactil();
+  /* A pie, el teléfono de lado: pantalla completa y bloqueo, o el aviso «Gira el teléfono». Ver `a-pie-apaisado.tsx`. */
+  const avisoDeGirar = usarAPieApaisado(aPie);
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const { alRecoger, aviso: avisoDelHallazgo } = usarElAvisoDelHallazgo('riberas', puesta.asientos);
   const laForja =
@@ -3530,6 +3533,7 @@ export function RiberasEnTres({
             {/* En un teléfono y a pie, la palanca: ver `mandos-tactiles.tsx`. */}
             <MandosTactiles mandos={mandos} visibles={tactil && aPie} conGolpe={canal !== undefined} />
             <PantallaCompleta flotante="izquierda" />
+            {avisoDeGirar}
             {/*
               LA SALIDA, y sólo cuando hace falta. Un zoom del que no se sabe volver
               atrapa: se entra a mirar una esquina del delta y ya no se encuentra el

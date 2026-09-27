@@ -18,7 +18,14 @@
 import { createRoot } from 'react-dom/client';
 import { BASE, Sala } from './sala';
 import { RedDeSeguridad } from './red-de-seguridad';
+import { vigilarElMando } from '../../escenas/paseo/aparato';
 import './estilo.css';
+
+/*
+ * DEDO O RATÓN, ANTES DEL PRIMER PINTADO: pone `data-mando` en `<html>`, que es lo que la hoja lee
+ * para los botones de 44 y los atajos que se esconden con el dedo (`escenas/paseo/aparato.ts`).
+ */
+vigilarElMando();
 
 const raiz = document.getElementById('raiz');
 if (raiz === null) throw new Error('Falta el <div id="raiz"> de index.html');

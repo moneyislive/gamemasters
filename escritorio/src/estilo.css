@@ -2262,11 +2262,13 @@ code {
  *
  * `.opcion-corta` baja a 2,25rem (38 puntos) para que «Cambiar» y «Copiar código» no pesen en el
  * raíl de un monitor. Con el dedo eso es fallar el toque: el fotógrafo lo midió en 43 en el móvil.
+ *
+ * «CON EL DEDO» ES `:root[data-mando='dedo']` Y NO `@media (pointer: coarse)` en toda esta hoja: la
+ * marca la pone `escenas/paseo/aparato.ts`, la misma fuente que saca la palanca, y un Windows con
+ * ratón que dice `coarse` (27-sep-2026) ya no crece los botones ni esconde sus atajos.
  */
-@media (pointer: coarse) {
-  .muelle-rail .opcion-corta {
-    min-height: 44px;
-  }
+:root[data-mando='dedo'] .muelle-rail .opcion-corta {
+  min-height: 44px;
 }
 
 /*
@@ -2303,11 +2305,9 @@ code {
   border-color: var(--acento);
 }
 
-@media (pointer: coarse) {
-  .pantalla-completa {
-    width: 44px;
-    height: 44px;
-  }
+:root[data-mando='dedo'] .pantalla-completa {
+  width: 44px;
+  height: 44px;
 }
 
 .pantalla-completa-flotante {
@@ -3414,10 +3414,8 @@ code {
   color: var(--tenue);
 }
 
-@media (pointer: coarse) {
-  .riberas-carril-atajo {
-    display: none;
-  }
+:root[data-mando='dedo'] .riberas-carril-atajo {
+  display: none;
 }
 
 /*
@@ -4596,6 +4594,27 @@ code {
   background: var(--palabra);
   color: var(--suelo);
   border-color: var(--palabra);
+}
+
+/*
+ * «RECOGER LA MESA», A PIE (27-sep-2026): el cromo de las cámaras, en su propio renglón debajo de ellas
+ * —la columna no coge el puntero, así que el botón lo pide él—. Recogida, con el filo del acento: la
+ * caja está fuera, y hay que poder encontrarla para volver a sacarla.
+ */
+.burgo-a-pie-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  max-width: calc(100vw - 1.5rem);
+  pointer-events: none;
+}
+
+.burgo-recoger {
+  pointer-events: auto;
+}
+
+.burgo-recoger-recogida {
+  border-color: var(--acento);
 }
 
 /* Es un cartel y no un control: no coge el puntero, igual que el de Las Lindes. */
@@ -6508,28 +6527,26 @@ code {
  *
  * «Girar», los renglones de «Dónde plantar» y las tres cámaras medían entre 30 y 36 puntos de
  * alto: bien con ratón, pequeños para un pulgar (§4.3 de `docs/PANTALLAS.md`). Sólo con puntero
- * grueso, para que en el ordenador el raíl no crezca.
+ * grueso —`data-mando`, ver `.muelle-rail .opcion-corta`—, para que en el ordenador el raíl no crezca.
  */
-@media (pointer: coarse) {
-  .lindes-girar,
-  .lindes-plantar button,
-  .lindes-camara {
-    min-height: 2.75rem;
-  }
+:root[data-mando='dedo'] .lindes-girar,
+:root[data-mando='dedo'] .lindes-plantar button,
+:root[data-mando='dedo'] .lindes-camara {
+  min-height: 2.75rem;
+}
 
-  .lindes-camara {
-    min-width: 2.75rem;
-  }
+:root[data-mando='dedo'] .lindes-camara {
+  min-width: 2.75rem;
+}
 
-  /* Con alto de sobra, `baseline` dejaba el rótulo pegado arriba y medio botón vacío debajo. */
-  .lindes-plantar button {
-    align-items: center;
-  }
+/* Con alto de sobra, `baseline` dejaba el rótulo pegado arriba y medio botón vacío debajo. */
+:root[data-mando='dedo'] .lindes-plantar button {
+  align-items: center;
+}
 
-  /* Las cámaras crecen a 44: el cartel de debajo baja con ellas para no quedarse pegado. */
-  .lindes-como-se-anda {
-    top: 3.8rem;
-  }
+/* Las cámaras crecen a 44: el cartel de debajo baja con ellas para no quedarse pegado. */
+:root[data-mando='dedo'] .lindes-como-se-anda {
+  top: 3.8rem;
 }
 
 /*
@@ -6988,4 +7005,92 @@ code {
   margin-top: 0.5rem;
   width: 100%;
   min-height: 2.75rem;
+}
+
+/*
+ * ═══ A PIE, «GIRA EL TELÉFONO» (`a-pie-apaisado.tsx`, 27-sep-2026) ═══
+ *
+ * El aviso de El Quiebro, pero sin atrapar: un velo que deja ver la calle y una tarjeta en medio con un
+ * teléfono que se tumba, dos frases y «Seguir de pie». Sale sólo con el dedo, a pie, en un teléfono de
+ * pie y donde el navegador no dejó ponerlo de lado; se va solo al girarlo. Encima de los mandos.
+ */
+.a-pie-gira {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: grid;
+  place-items: center;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right)) max(1rem, env(safe-area-inset-bottom))
+    max(1rem, env(safe-area-inset-left));
+  background: rgba(8, 10, 14, 0.55);
+}
+
+.a-pie-gira-tarjeta {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 20rem;
+  padding: 1.25rem 1.25rem 1rem;
+  text-align: center;
+  color: var(--palabra);
+  background: var(--teja-alta);
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-ficha);
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.7);
+}
+
+.a-pie-gira-telefono {
+  width: 34px;
+  height: 58px;
+  border: 2px solid var(--acento);
+  border-radius: 7px;
+  animation: a-pie-gira 2.2s ease-in-out infinite;
+}
+
+@keyframes a-pie-gira {
+  0%,
+  30% {
+    transform: rotate(0deg);
+  }
+  60%,
+  100% {
+    transform: rotate(-90deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .a-pie-gira-telefono {
+    animation: none;
+    transform: rotate(-90deg);
+  }
+}
+
+.a-pie-gira-titulo {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.a-pie-gira-porque {
+  margin: 0;
+  font-size: var(--letra-minima);
+  color: var(--tenue);
+}
+
+.a-pie-gira-seguir {
+  min-height: 44px;
+  padding: 0.5rem 1rem;
+  font: inherit;
+  font-size: var(--letra-minima);
+  font-weight: 600;
+  color: var(--palabra);
+  background: transparent;
+  border: 1px solid var(--filo);
+  border-radius: var(--radio-mando);
+  cursor: pointer;
+}
+
+.a-pie-gira-seguir:hover {
+  border-color: var(--acento);
 }

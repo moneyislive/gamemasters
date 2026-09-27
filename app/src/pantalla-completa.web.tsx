@@ -28,6 +28,7 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
+import { mandoActual } from '../../escenas/paseo/aparato';
 import { conAlfa } from './tema';
 import { RADIO, SALA } from './arcade/muebles';
 
@@ -87,9 +88,12 @@ function soltar(): void {
   }
 }
 
-/** ¿Se juega con el dedo? Sólo ahí se pide sola. */
+/**
+ * ¿Se juega con el dedo? Sólo ahí se pide sola. Del almacén único (`escenas/paseo/aparato.ts`) y no de
+ * `(pointer: coarse)` a secas, que en un Windows con ratón también casa (27-sep-2026).
+ */
 function esTactil(): boolean {
-  return typeof matchMedia === 'function' && matchMedia('(pointer: coarse)').matches;
+  return mandoActual() === 'dedo';
 }
 
 /** ¿Hay un gesto reciente con el que el navegador deje pedirla ya? */

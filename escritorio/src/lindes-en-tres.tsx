@@ -53,6 +53,7 @@ import type { MandosDeFuera } from '../../escenas/paseo/mandos';
 import { escudosDeLaVista, LEVA } from '../../shared/arcade/juegos/lindes-escudos';
 import { LosEscudos, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { LimiteDelMundo } from './lienzo-propio';
+import { usarAPieApaisado } from './a-pie-apaisado';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 import { PantallaCompleta } from './pantalla-completa';
 import { direccionDelCanal } from './mesa';
@@ -215,6 +216,8 @@ export function LindesEnTres({
    * escudo, que la escena cuenta por `alRecoger` (`a-pie-en-botas.tsx`).
    */
   const tactil = usarAparatoTactil();
+  /* A pie, el teléfono de lado: pantalla completa y bloqueo, o el aviso «Gira el teléfono». Ver `a-pie-apaisado.tsx`. */
+  const avisoDeGirar = usarAPieApaisado(modo !== 'mesa');
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const { alRecoger, aviso } = usarElAvisoDelHallazgo('lindes', puesta.asientos);
 
@@ -363,6 +366,7 @@ export function LindesEnTres({
 
         <ComoSeAnda modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} tactil={tactil} />
         <PantallaCompleta flotante="izquierda" />
+        {avisoDeGirar}
 
         <div className="lindes-camaras" role="group" aria-label="Desde dónde se mira">
           {LAS_CAMARAS_DEL_VALLE.map((c) => (

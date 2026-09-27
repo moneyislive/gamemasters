@@ -73,6 +73,14 @@ import { REBOTE_DEL_DADO, SACUDIDA, SALTO_DEL_DADO } from '../dados';
 import { ALTURA_DEL_SALTO_DEL_DOBLE } from './dados-del-burgo';
 import type { Punto } from './anillo-en-3d';
 
+/**
+ * LAS DOS CARAS DEL BOTÓN QUE QUITA LA CAJA DE DELANTE (`bandejaRecogida`, 27-sep-2026), con las
+ * palabras de «Recoger la mesa» de Riberas. Aquí para que la Sala y la app digan lo mismo: el nombre de
+ * un botón dice lo que va a pasar al pulsarlo.
+ */
+export const RECOGER_LA_MESA = 'Recoger la mesa';
+export const SACAR_LA_MESA = 'Sacar la mesa';
+
 /* ─────────────────────────────── Los dados, en unidades de bandeja ─────────────────────────────── */
 
 /** La arista de un dado. La de siempre: la caja entera se escala, los dados no cambian. */

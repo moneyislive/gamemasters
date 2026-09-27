@@ -51,15 +51,20 @@
  * `pointerup`, y la palanca seguiría empujando al volver. Al perder el foco o esconderse la página se
  * suelta la palanca (lo mismo que hace `quiebro/mandos/Tactil.tsx`).
  *
- * ═══ SÓLO EN UN APARATO TÁCTIL, Y SÓLO A PIE ═══
+ * ═══ SÓLO CON EL DEDO, Y SÓLO A PIE ═══
  *
- * `usarAparatoTactil`: puntero grueso (`(pointer: coarse)`) o toque (`navigator.maxTouchPoints`), y
- * reacciona si cambia —una tableta a la que se le engancha un ratón, o un portátil con pantalla
- * táctil en el que se toca por primera vez—. En la mesa no hay a quién mover y no se pinta; y cuando
- * no se pinta NO EXISTE, que un mando invisible que siguiera cogiendo el dedo taparía el tablero.
+ * `usarAparatoTactil` lee el almacén único de `escenas/paseo/aparato.ts`. Hasta el 27-sep-2026 era
+ * «`(pointer: coarse)` O `navigator.maxTouchPoints > 0`», y Miguel vio la palanca y «Correr» en su
+ * ORDENADOR: un Windows con ratón da 10 puntos de toque (y aquí, además, `coarse`). Ahora es dedo sólo
+ * si el puntero principal es un dedo en un sistema que no es de ordenador, y luego manda el uso: un
+ * toque de verdad pasa a dedo, mover el ratón o pulsar una tecla de andar pasa a teclado. En la mesa
+ * no hay a quién mover y no se pinta; y cuando no se pinta NO EXISTE, que un mando invisible que
+ * siguiera cogiendo el dedo taparía el tablero.
  */
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import type { JSX, MouseEvent as EventoDeRaton, MutableRefObject, PointerEvent as EventoDePuntero } from 'react';
+import { mandoActual, mandoAlAbrir, mandoSinVentana, suscribirAlMando } from '../../escenas/paseo/aparato';
+import type { ElAparato } from '../../escenas/paseo/aparato';
 import { SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
 
@@ -111,59 +116,24 @@ export function conUnGolpeMas(antes: MandosDeFuera): MandosDeFuera {
   return { palanca: antes.palanca, deprisa: antes.deprisa, golpes: antes.golpes + 1 };
 }
 
-/** Lo que hace falta saber del aparato para decidir si es táctil: sin `window`, para poder probarlo. */
-export interface ElAparato {
-  /** Si `(pointer: coarse)` casa. */
-  readonly punteroGrueso: boolean;
-  /** `navigator.maxTouchPoints`, o `undefined` si el navegador no lo dice. */
-  readonly puntosDeToque: number | undefined;
-}
-
-/** ¿SE TOCA? Puntero grueso, o algún punto de toque. */
+/**
+ * ¿SE TOCA? La suposición al abrir, que es de `escenas/paseo/aparato.ts` (`mandoAlAbrir`): se
+ * reexporta con su nombre de siempre para `verify:escritorio`. NUNCA con `maxTouchPoints` solo, que
+ * es lo que sacaba la palanca en los Windows con ratón (ver la cabecera de allí).
+ */
 export function esAparatoTactil(aparato: ElAparato): boolean {
-  return aparato.punteroGrueso || (typeof aparato.puntosDeToque === 'number' && aparato.puntosDeToque > 0);
+  return mandoAlAbrir(aparato) === 'dedo';
 }
-
-/** La consulta del puntero grueso. */
-const PUNTERO_GRUESO = '(pointer: coarse)';
-
-/** El aparato de esta ventana; fuera de un navegador (Node, `verify:escritorio`), ninguno. */
-function elAparatoDeAqui(): ElAparato {
-  if (typeof window === 'undefined') return { punteroGrueso: false, puntosDeToque: undefined };
-  const grueso = typeof window.matchMedia === 'function' ? window.matchMedia(PUNTERO_GRUESO).matches : false;
-  const puntos = typeof navigator !== 'undefined' ? navigator.maxTouchPoints : undefined;
-  return { punteroGrueso: grueso, puntosDeToque: puntos };
-}
+export type { ElAparato };
 
 /**
- * ¿ESTE APARATO SE TOCA? Y cambia si cambia: la consulta del puntero avisa cuando se engancha o se
- * suelta un ratón, y el primer `pointerdown` de un dedo lo enciende aunque la consulta dijera que no
- * —un portátil con pantalla táctil cuyo puntero principal es el ratón—. Una vez encendido por un dedo
- * no se apaga solo: quien ha tocado la pantalla puede volver a tocarla.
+ * ¿SE JUEGA CON EL DEDO AHORA MISMO? El almacén único de `escenas/paseo/aparato.ts`: la suposición al
+ * abrir y, luego, el uso de verdad —un toque pasa a dedo; mover el ratón o pulsar una tecla de andar,
+ * a ratón y teclado—. Los tres pintores de la Sala, la pantalla completa y la hoja (por la marca
+ * `data-mando` de `<html>`) leen de ahí, y por eso no pueden discrepar.
  */
 export function usarAparatoTactil(): boolean {
-  const [tactil, ponerTactil] = useState<boolean>(() => esAparatoTactil(elAparatoDeAqui()));
-  useEffect(() => {
-    if (typeof window === 'undefined') return undefined;
-    const consulta = typeof window.matchMedia === 'function' ? window.matchMedia(PUNTERO_GRUESO) : null;
-    let tocado = false;
-    const mirar = (): void => {
-      ponerTactil(tocado || esAparatoTactil(elAparatoDeAqui()));
-    };
-    const alTocar = (e: PointerEvent): void => {
-      if (e.pointerType !== 'touch' || tocado) return;
-      tocado = true;
-      ponerTactil(true);
-    };
-    mirar();
-    consulta?.addEventListener('change', mirar);
-    window.addEventListener('pointerdown', alTocar, { capture: true, passive: true });
-    return () => {
-      consulta?.removeEventListener('change', mirar);
-      window.removeEventListener('pointerdown', alTocar, { capture: true });
-    };
-  }, []);
-  return tactil;
+  return useSyncExternalStore(suscribirAlMando, mandoActual, mandoSinVentana) === 'dedo';
 }
 
 // ---------------------------------------------------------------------------

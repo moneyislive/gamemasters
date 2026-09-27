@@ -115,6 +115,7 @@ import {
   ROTULO_DE_LA_LEVA,
   usarElAvisoDelHallazgo,
 } from './a-pie-en-botas';
+import { usarAPieApaisado } from './a-pie-apaisado';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { BotonDeGolpear } from './mandos-del-paseo';
 import { direccionDelCanal } from './mesa';
@@ -159,6 +160,12 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
   const { mesa, vista, juego, nombres, abajo, laBarra } = pintor;
   usarPantallaCompleta(); /* Sin barras del sistema mientras se juega; vuelven al salir. */
   const [modo, ponerModo] = useState<'mesa' | 'hombro' | 'ojos'>('mesa');
+  /*
+   * A PIE, EL TELÉFONO DE LADO (27-sep-2026, Miguel: «no se pone en horizontal la pantalla»): el gancho
+   * común bloquea en horizontal al bajar a andar y devuelve la orientación al volver a la mesa; en
+   * `/jugar` pide pantalla completa y bloqueo, o enseña «Gira el teléfono». Ver `a-pie-apaisado.tsx`.
+   */
+  const avisoDeGirar = usarAPieApaisado(modo !== 'mesa');
   /*
    * EL AVISO AL RECOGER, también aquí arriba con los demás ganchos. Se le pasa a la escena siempre:
    * en una mesa normal no hay canal y nadie lo llama.
@@ -316,6 +323,7 @@ function ElValleEnLaMesa(pintor: LoQueVeElPintor): JSX.Element {
         */}
         <MandosDelPaseo mandos={mandos} visibles={modo !== 'mesa'} />
         <BotonDeGolpear mandos={mandos} visible={modo !== 'mesa' && canal !== undefined} />
+        {avisoDeGirar}
 
         {/*
           CÓMO VA EL CANAL, arriba a la izquierda —la derecha es de las cámaras y abajo están

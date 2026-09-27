@@ -3160,7 +3160,8 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
    * la inclinación a secas.
    */
   const dentroDeLaBandeja = (codigo: string): boolean => {
-    const desde = codigo.indexOf('<group ref={grupoDeLaBandeja}>');
+    /* Sin el `>`: desde el 27-sep el grupo lleva `visible={!recogida}` (la mesa recogida, abajo). */
+    const desde = codigo.indexOf('<group ref={grupoDeLaBandeja}');
     const cierre = /onPointerUp=\{tocaLosDados\}[^<]*?\/>\s*\)\s*:\s*null\}\s*<\/group>\s*<\/group>/.exec(codigo);
     if (desde < 0 || cierre === null || cierre.index < desde) return false;
     const trozo = codigo.slice(desde, cierre.index);
@@ -3185,6 +3186,24 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
     !dentroDeLaBandeja(`${cajaDePrueba('')}</group></group>\n{dados?.porTirar === true ? (<mesh position={[0, 3, 0]} onPointerUp={tocaLosDados} />) : null}\n<group ref={naipeGrupo}>`) &&
       !dentroDeLaBandeja(`${cajaDePrueba('{dados?.porTirar === true ? (<mesh onPointerUp={tocaLosDados} />) : null}', 'CAJA.inclinacion')}</group></group>`) &&
       dentroDeLaBandeja(`${cajaDePrueba('{dados?.porTirar === true ? (<mesh onPointerUp={tocaLosDados} />) : null}')}</group></group>`),
+  );
+  /*
+   * LA MESA RECOGIDA (`bandejaRecogida`, 27-sep-2026). Miguel, andando: «no hay botón para esconder la
+   * mesa con los dados y el reloj». Recogida, el grupo de la caja no se pinta (`visible`) Y NO SE TOCA:
+   * r3f no mira `visible` al tirar rayos, así que la caja que para los toques y las dos asas se
+   * DESMONTAN. Una caja invisible que siguiera parando toques se comería la calle que dejó ver.
+   */
+  const seRecoge = (codigo: string): boolean =>
+    /const recogida = props\.bandejaRecogida === true;/.test(codigo) &&
+    /<group ref=\{grupoDeLaBandeja\} visible=\{!recogida\}>/.test(codigo) &&
+    /\{cajaGeometria === null \|\| recogida \? null : \(/.test(codigo) &&
+    /\{!recogida && props\.reloj\?\.disponible === true && props\.alPasarElTurno !== undefined \? \(/.test(codigo) &&
+    /\{!recogida && dados\?\.porTirar === true \? \(/.test(codigo);
+  comprobar('recogida, la caja del Burgo no se pinta y no se toca: la caja que para los toques y las dos asas se desmontan', seRecoge(codigoDelBurgo));
+  comprobar(
+    'se ve fallar: con el asa de los dados montada aunque esté recogida (invisible, seguiría tirando), o con la caja sólo escondida, cae',
+    !seRecoge(codigoDelBurgo.replace('{!recogida && dados?.porTirar === true ? (', '{dados?.porTirar === true ? (')) &&
+      !seRecoge(codigoDelBurgo.replace('{cajaGeometria === null || recogida ? null : (', '{cajaGeometria === null ? null : (')),
   );
   /*
    * PASAR EL TURNO ES TOCAR EL RELOJ, NO APRETARLO. El asa propia de `RelojDeArena` pasa al apretar, y va

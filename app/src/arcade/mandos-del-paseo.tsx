@@ -74,6 +74,7 @@ import { Animated, PanResponder, Pressable, StyleSheet, Text, useWindowDimension
 import type { AccessibilityActionInfo, LayoutChangeEvent } from 'react-native';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
+import { usarAparatoTactil } from './aparato-tactil';
 import { LETRA } from './muebles';
 
 /**
@@ -124,7 +125,14 @@ export interface MandosDelPaseoProps {
   readonly visibles: boolean;
 }
 
-export function MandosDelPaseo({ mandos, visibles }: MandosDelPaseoProps): JSX.Element | null {
+export function MandosDelPaseo({ mandos, visibles: aPie }: MandosDelPaseoProps): JSX.Element | null {
+  /*
+   * A PIE Y CON EL DEDO. En el teléfono, siempre; en `/jugar` abierto en un ORDENADOR se anda con W A S D
+   * y la palanca sobra (`aparato-tactil.web.ts`, 27-sep-2026). Si deja de ser táctil a mitad de paseo
+   * —se movió el ratón—, se suelta todo igual que al subir a la mesa.
+   */
+  const tactil = usarAparatoTactil();
+  const visibles = aPie && tactil;
   const [corriendo, ponerCorriendo] = useState(false);
   /* Se crea una vez: un `Animated.ValueXY` nuevo por pintado soltaría el pomo a mitad de arrastre. */
   const [pomo] = useState(() => new Animated.ValueXY({ x: 0, y: 0 }));
@@ -206,7 +214,10 @@ export interface BotonDeGolpearProps {
  * «GOLPEAR»: un toque, un golpe. Ver la cabecera: por qué `onTouchStart` y no un `Pressable`, dónde
  * va y por qué no se pinta cuando no toca.
  */
-export function BotonDeGolpear({ mandos, visible }: BotonDeGolpearProps): JSX.Element | null {
+export function BotonDeGolpear({ mandos, visible: toca }: BotonDeGolpearProps): JSX.Element | null {
+  /* Con el ratón y el teclado se golpea con la G: el botón es del dedo, como la palanca. */
+  const tactil = usarAparatoTactil(); /* Siempre, y antes de mirar `toca`: un gancho detrás de un `&&` cambia el orden. */
+  const visible = toca && tactil;
   const ventana = useWindowDimensions();
   const [medido, ponerMedido] = useState(0);
   const [apretado, ponerApretado] = useState(false);

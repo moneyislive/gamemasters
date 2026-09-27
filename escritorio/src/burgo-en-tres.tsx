@@ -200,9 +200,10 @@ import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
 import { usarElAvisoDelHallazgo } from './a-pie-en-botas';
+import { usarAPieApaisado } from './a-pie-apaisado';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 import { PantallaCompleta } from './pantalla-completa';
-import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
+import { poseDeLaBandeja, RECOGER_LA_MESA, SACAR_LA_MESA } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RectanguloEnPuntos, SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../escenas/reloj';
 import {
@@ -535,6 +536,12 @@ export function ComoSeAndaPorElBurgo({
 }
 
 /**
+ * LAS DOS CARAS DEL BOTÓN DE LA MESA, con las palabras de Riberas (`riberas-en-tres.tsx`): el nombre
+ * de un botón dice lo que va a pasar al pulsarlo. Ver «LA MESA RECOGIDA» en el pintor.
+ */
+export { RECOGER_LA_MESA, SACAR_LA_MESA };
+
+/**
  * LAS TRES CÁMARAS Y EL CARTEL, en una columna arriba a la izquierda del lienzo: debajo de la
  * cinta, y una tira más abajo si hay carril, con la misma cuenta que «Ver el burgo entero» usa al
  * otro lado (`.burgo-a-pie-con-carril`). La columna no coge el puntero —lo que queda entre los
@@ -546,6 +553,8 @@ export function LasCamarasDelBurgo({
   conCarril,
   canal,
   tactil = false,
+  recogida = null,
+  alRecogerLaMesa,
 }: {
   readonly modo: ModoDelBurgo;
   readonly alElegir: (modo: ModoDelBurgo) => void;
@@ -554,24 +563,44 @@ export function LasCamarasDelBurgo({
   readonly canal?: string;
   /** Si el aparato se toca: el cartel dice la palanca y no el teclado. */
   readonly tactil?: boolean;
+  /**
+   * LA MESA RECOGIDA, A PIE: `true`/`false` pinta «Sacar la mesa»/«Recoger la mesa» debajo de las
+   * cámaras; `null` —en la mesa, o sin mundo— no pinta nada, que no hay caja delante que quitar.
+   */
+  readonly recogida?: boolean | null;
+  readonly alRecogerLaMesa?: () => void;
 }): JSX.Element {
   return (
     <div className={conCarril ? 'burgo-a-pie burgo-a-pie-con-carril' : 'burgo-a-pie'}>
-      <div className="burgo-camaras" role="group" aria-label="Desde dónde se mira el burgo">
-        {LAS_CAMARAS_DEL_BURGO.map((c) => (
+      {/* Las cámaras y «Recoger la mesa» en una fila que se parte: tumbado caben juntas y el cartel no baja hasta la palanca. */}
+      <div className="burgo-a-pie-fila">
+        <div className="burgo-camaras" role="group" aria-label="Desde dónde se mira el burgo">
+          {LAS_CAMARAS_DEL_BURGO.map((c) => (
+            <button
+              key={c.modo}
+              type="button"
+              className={modo === c.modo ? 'burgo-camara burgo-camara-puesta' : 'burgo-camara'}
+              aria-pressed={modo === c.modo}
+              title={c.ayuda}
+              onClick={() => {
+                alElegir(c.modo);
+              }}
+            >
+              {c.rotulo}
+            </button>
+          ))}
+        </div>
+        {recogida === null || alRecogerLaMesa === undefined ? null : (
           <button
-            key={c.modo}
             type="button"
-            className={modo === c.modo ? 'burgo-camara burgo-camara-puesta' : 'burgo-camara'}
-            aria-pressed={modo === c.modo}
-            title={c.ayuda}
-            onClick={() => {
-              alElegir(c.modo);
-            }}
+            className={recogida ? 'burgo-camara burgo-recoger burgo-recoger-recogida' : 'burgo-camara burgo-recoger'}
+            title={recogida ? 'Vuelve a poner delante la caja con los dados, tu dinero y el reloj' : 'Quita de delante la caja con los dados y el reloj para ver la calle; tirar y pasar siguen en la tira de arriba'}
+            onClick={alRecogerLaMesa}
           >
-            {c.rotulo}
+            <span aria-hidden="true">{recogida ? '▲ ' : '▼ '}</span>
+            {recogida ? SACAR_LA_MESA : RECOGER_LA_MESA}
           </button>
-        ))}
+        )}
       </div>
       <ComoSeAndaPorElBurgo modo={modo} canal={canal} tactil={tactil} />
     </div>
@@ -1242,6 +1271,22 @@ export function BurgoEnTres({
    */
   const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
   const aPie = modo !== 'mesa';
+  /*
+   * ═══ LA MESA RECOGIDA: LA CAJA Y EL RELOJ FUERA DE LA VISTA, A PIE ═══
+   *
+   * Miguel, andando por el Burgo (27-sep-2026): «no hay botón para esconder la mesa con los dados y el
+   * reloj». La caja va pegada a la cámara, y a ras de calle es media pantalla de nogal delante. El botón
+   * es el de Riberas con sus mismas palabras (`RECOGER_LA_MESA`, `SACAR_LA_MESA`), y sale A PIE, que es
+   * donde estorba: en la mesa la caja es parte del tablero. Recogida, lo imprescindible sigue a mano:
+   * TIRAR vuelve al carril (la criba recibe `null` en vez de los dados, como el naipe del mazo de
+   * Riberas), pasar ya vive en el carril y el dinero en la ficha de la cinta. Volver a la mesa la saca.
+   * Es de la pantalla y no viaja, como `modo`.
+   */
+  const [mesaRecogida, ponerMesaRecogida] = useState(false);
+  const recogida = aPie && mesaRecogida;
+  useEffect(() => {
+    if (!aPie) ponerMesaRecogida(false);
+  }, [aPie]);
   const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? { modo: 'mesa' } : { modo, asiento: yo ?? '' }), [modo, yo]);
 
   /*
@@ -1280,6 +1325,8 @@ export function BurgoEnTres({
    * por la calle, que la escena cuenta por `alRecoger` (`a-pie-en-botas.tsx`).
    */
   const tactil = usarAparatoTactil();
+  /* A pie, el teléfono de lado: pantalla completa y bloqueo, o el aviso «Gira el teléfono». Ver `a-pie-apaisado.tsx`. */
+  const avisoDeGirar = usarAPieApaisado(aPie);
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const { alRecoger, aviso: avisoDelHallazgo } = usarElAvisoDelHallazgo('burgo', puesta.asientos);
   /* A pie y con el dedo, la caja se aparta de la palanca y de los botones: ver `sitioDeLaBandejaAPie`. */
@@ -1360,12 +1407,12 @@ export function BurgoEnTres({
       opcionesFueraDelTablero(
         opciones,
         conMundo ? datos : null,
-        conMundo ? dados : null,
+        conMundo && !recogida ? dados : null,
         cajonAbierto ? hoja : null,
         pregon,
         hayCarrilDelMomento ? delMomento : null,
       ),
-    [opciones, conMundo, datos, dados, hoja, cajonAbierto, pregon, delMomento, hayCarrilDelMomento],
+    [opciones, conMundo, datos, dados, recogida, hoja, cajonAbierto, pregon, delMomento, hayCarrilDelMomento],
   );
 
   /*
@@ -1925,7 +1972,7 @@ export function BurgoEnTres({
               caería al `body` y el lector perdería el sitio. Se apaga con `aria-disabled` y NO
               con `disabled`, que le quitaría el foco igual.
             */}
-            {dados !== null ? (
+            {dados !== null && !recogida ? (
               <button
                 type="button"
                 className="burgo-solo-apoyo"
@@ -1996,6 +2043,7 @@ export function BurgoEnTres({
                   calidad={calidad}
                   camara={camara}
                   bandejaDeLosDados={sitioDeLaBandeja}
+                  bandejaRecogida={recogida}
                   reloj={relojDeArena}
                   alPasarElTurno={alPasarElTurno}
                   seguirAlQueMueve={siguiendo && aQuienSigue !== null}
@@ -2021,7 +2069,9 @@ export function BurgoEnTres({
             </LimiteDelMundo>
             {avisoDelHallazgo}
             {/* En un teléfono y a pie, la palanca: ver `mandos-tactiles.tsx`. */}
-            <MandosTactiles mandos={mandos} visibles={tactil && aPie} conGolpe={canal !== undefined} />            {/*
+            <MandosTactiles mandos={mandos} visibles={tactil && aPie} conGolpe={canal !== undefined} />
+            {avisoDeGirar}
+            {/*
               A PIE: las tres cámaras y, mientras se anda, cómo se anda; y en una mesa de botas, en los
               dos modos, cómo va el canal. Ver `LasCamarasDelBurgo`.
             */}
@@ -2031,6 +2081,8 @@ export function BurgoEnTres({
               conCarril={cuadrados.length > 0}
               canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}
               tactil={tactil}
+              recogida={aPie && conMundo ? mesaRecogida : null}
+              alRecogerLaMesa={() => ponerMesaRecogida((r) => !r)}
             />
             {/*
               LA SALIDA, y sólo cuando hace falta. Está FUERA del `Canvas`: es un botón de la

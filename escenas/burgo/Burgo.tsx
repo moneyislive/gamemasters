@@ -1321,6 +1321,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
    */
   const tamanoDelLienzo = useThree((s) => s.size);
   const campoDeLaCamara = useThree((s) => (s.camera as THREE.PerspectiveCamera).fov);
+  /* La mesa recogida: ver `bandejaRecogida` en `tipos.ts` y el grupo de la caja, abajo. */
+  const recogida = props.bandejaRecogida === true;
   const esquinaDeLaBandeja = props.bandejaDeLosDados?.esquina ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.esquina;
   const margenDeLaBandeja = props.bandejaDeLosDados?.margen ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.margen;
   /* Lo que la aparta de los mandos de un teléfono a pie (ver `SitioDeLaBandeja`): sin ellos, lo de siempre. */
@@ -3246,14 +3248,19 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
         rayos —es el fallo que contó una interfaz apagada que seguía cogiendo piezas—, así que un asa
         escondida se sigue tocando y no se dibuja. Se DESMONTAN cuando no se puede mandar, que es lo que sí
         le quita el toque.
+
+        RECOGIDA (`bandejaRecogida`, el botón «Recoger la mesa» de los dos clientes) el grupo entero va
+        con `visible={false}` —sigue montado, así los billetes, las casas y los dados escritos en sus
+        mallas vuelven igual al sacarla— y se DESMONTAN la caja que para los toques y las dos asas: sin
+        eso la caja invisible seguiría tragándose los toques de la calle que tapaba.
       */}
-      <group ref={grupoDeLaBandeja}>
+      <group ref={grupoDeLaBandeja} visible={!recogida}>
         <group
           position={[poseDeLaBandejaEnPantalla.x, poseDeLaBandejaEnPantalla.y, poseDeLaBandejaEnPantalla.z]}
           rotation={[poseDeLaBandejaEnPantalla.cabeceo, 0, 0]}
           scale={[poseDeLaBandejaEnPantalla.escala, poseDeLaBandejaEnPantalla.escala, poseDeLaBandejaEnPantalla.escala]}
         >
-          {cajaGeometria === null ? null : (
+          {cajaGeometria === null || recogida ? null : (
             <mesh geometry={cajaGeometria} material={materiales.suelo} onPointerDown={paraElToque} onPointerUp={paraElToque} onPointerMove={paraElToque} onPointerOver={paraElToque} onPointerOut={paraElToque} />
           )}
           {/* Las casas y los hoteles que le quedan al Concejo. */}
@@ -3303,10 +3310,10 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
               )}
             </group>
           ))}
-          {props.reloj?.disponible === true && props.alPasarElTurno !== undefined ? (
+          {!recogida && props.reloj?.disponible === true && props.alPasarElTurno !== undefined ? (
             <mesh position={[asaParaPasar.x, asaParaPasar.y, asaParaPasar.z]} geometry={asaParaPasarGeometria} material={materiales.asa} visible={false} onPointerDown={empiezaElToque} onPointerUp={tocaElReloj} />
           ) : null}
-          {dados?.porTirar === true ? (
+          {!recogida && dados?.porTirar === true ? (
             <mesh position={[asaDeLosDados.x, asaDeLosDados.y, asaDeLosDados.z]} geometry={asaDeLosDadosGeometria} material={materiales.asa} visible={false} onPointerDown={empiezaElToque} onPointerUp={tocaLosDados} />
           ) : null}
         </group>

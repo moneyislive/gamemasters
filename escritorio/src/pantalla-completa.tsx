@@ -27,6 +27,10 @@
  * `pointerdown` —ése sólo la da con ratón—. Se escucha en captura sobre `document` para verlo antes
  * que nadie, sin `preventDefault`: el toque sigue siendo del juego, que lo usa para lo suyo.
  *
+ * SÓLO CON EL DEDO (`usarAparatoTactil`, el almacén único de `escenas/paseo/aparato.ts`) y sólo con
+ * un toque de verdad (`pointerType === 'touch'`): en un ordenador —aunque diga `maxTouchPoints` 10 o
+ * `(pointer: coarse)`, como el de Miguel— quitarle a alguien sus pestañas sin preguntar no se hace.
+ *
  * Una vez por partida montada, y no a cada toque: quien sale de la pantalla completa con el gesto de
  * atrás ha decidido salir, y perseguirle con otra petición en el siguiente toque sería quitarle la
  * decisión. El botón sigue ahí para volver.
@@ -144,7 +148,8 @@ function usarLaPeticionAlPrimerToque(activa: boolean): void {
   useEffect(() => {
     if (!activa || pedida.current || typeof document === 'undefined') return undefined;
     const alLevantar = (e: PointerEvent): void => {
-      if (e.pointerType === 'mouse' || pedida.current) return;
+      /* Sólo un DEDO: ni el ratón ni el lápiz de un portátil táctil piden nada solos. */
+      if (e.pointerType !== 'touch' || pedida.current) return;
       pedida.current = true;
       document.removeEventListener('pointerup', alLevantar, true);
       pedirPantallaCompleta(elDocumento());

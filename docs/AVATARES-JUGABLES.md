@@ -122,9 +122,21 @@ La leva se pide cuando se quiera mientras la partida se juega. **El botín** de 
 
 ## 6 · Los clientes
 
-- **Sala web en un teléfono:** palanca, «Correr» y «Golpear» en DOM, sobre el lienzo, si el
-  puntero es grueso (`(pointer: coarse)`) o hay toque; el cartel de cómo se anda dice «arrastra
-  la palanca» en vez de «WASD». Escriben los mismos `MandosDeFuera` que la app.
+- **Sala web en un teléfono:** palanca, «Correr» y «Golpear» en DOM, sobre el lienzo, sólo CON EL
+  DEDO; el cartel de cómo se anda dice «arrastra la palanca» en vez de «WASD». Escriben los mismos
+  `MandosDeFuera` que la app.
+- **Dedo o ratón, una sola fuente (27-sep-2026):** `escenas/paseo/aparato.ts`. Al abrir, dedo sólo
+  si `(hover: none) and (pointer: coarse)` Y el sistema no es de ordenador (un Windows con ratón da
+  `maxTouchPoints` 10 y hasta `coarse`: Miguel veía la palanca en su ordenador); luego manda el uso
+  (un toque pasa a dedo; mover el ratón o pulsar W A S D / Mayúsculas / G, a teclado). Lo leen los
+  tres pintores de la Sala, la pantalla completa, `/jugar` (`aparato-tactil.web.ts`) y la hoja por
+  `:root[data-mando='dedo']`, que sustituye a todo `@media (pointer: coarse)`.
+- **A pie, de lado:** en la app, `usarAPieApaisado` (`app/src/arcade/a-pie-apaisado.tsx`) bloquea en
+  horizontal al bajar a andar en los tres juegos y devuelve la orientación en «La mesa». En la web
+  (Sala y `/jugar`), con el dedo en un teléfono de pie, pantalla completa + `screen.orientation.lock`
+  si se deja, y si no el aviso «Gira el teléfono», que se quita con «Seguir de pie».
+- **El Burgo, «Recoger la mesa»:** a pie, en los dos clientes, quita la caja de los dados y el reloj
+  (`bandejaRecogida`); TIRAR vuelve al carril y el dinero sigue en la cinta. Volver a la mesa la saca.
 - **Los brotes se ven** en los tres juegos y los dos clientes (`escenas/paseo/`), con un aviso al
   recoger.
 - **Forja** (Riberas) y **leva** (Las Lindes): paneles en los dos clientes, con las alforjas y los

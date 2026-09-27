@@ -214,7 +214,7 @@ import type { ModoDelBurgo } from '../../../escenas/burgo/a-pie';
 import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
-import { poseDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
+import { poseDeLaBandeja, RECOGER_LA_MESA, SACAR_LA_MESA } from '../../../escenas/burgo/bandeja-de-los-dados';
 import type { SitioDeLaBandeja } from '../../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../../escenas/reloj';
 /*
@@ -253,6 +253,7 @@ import {
   usarLaSeccionAbierta,
   ANCHO_DEL_CARRIL_SIN_ROTULO,
 } from './hojas-del-burgo';
+import { usarAPieApaisado } from './a-pie-apaisado';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { BotonDeGolpear } from './mandos-del-paseo';
 import { ElAvisoDelHallazgo, usarElAvisoDelHallazgo } from './a-pie-en-botas';
@@ -601,9 +602,19 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    * se va a sus secciones, donde se lee con su rótulo largo. Nunca está en los dos
    * sitios a la vez.
    */
+  /*
+   * ═══ LA MESA RECOGIDA (27-sep-2026) ═══
+   *
+   * Miguel, andando por el Burgo: «no hay botón para esconder la mesa con los dados y el reloj». A pie,
+   * «Recoger la mesa» (las palabras de Riberas) quita la caja y el reloj de delante (`bandejaRecogida`
+   * de la escena) y TIRAR vuelve a los botones del pie: la criba recibe `null` en vez de los dados,
+   * como con el naipe del mazo de Riberas. El dinero sigue en la cinta, pasar sigue en el carril.
+   * Sólo puede estar recogida a pie: volver a la mesa la saca (efecto de más abajo, junto a `modo`).
+   */
+  const [mesaRecogida, ponerMesaRecogida] = useState(false);
   const fuera = useMemo(
-    () => opcionesFueraDelTablero(opciones, datos, dados, cajonAbierto ? hoja : null, pregon, carril),
-    [opciones, datos, dados, hoja, cajonAbierto, pregon, carril],
+    () => opcionesFueraDelTablero(opciones, datos, mesaRecogida ? null : dados, cajonAbierto ? hoja : null, pregon, carril),
+    [opciones, datos, dados, mesaRecogida, hoja, cajonAbierto, pregon, carril],
   );
 
   /*
@@ -643,10 +654,10 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    */
   const accionesDelLienzo = useMemo(() => {
     const lista: { readonly name: string; readonly label: string }[] = [];
-    if (dados !== null && dados.porTirar) lista.push({ name: 'tirar', label: 'Tirar los dados' });
+    if (dados !== null && dados.porTirar && !mesaRecogida) lista.push({ name: 'tirar', label: 'Tirar los dados' });
     for (const [i, o] of soloEnElAnillo.entries()) lista.push({ name: `obra:${String(i)}`, label: o.rotulo });
     return lista.length === 0 ? undefined : lista;
-  }, [dados, soloEnElAnillo]);
+  }, [dados, mesaRecogida, soloEnElAnillo]);
 
   /* Cómo se llama una casilla, preguntado a la traducción y no a una tabla de aquí. */
   const nombreDeCasilla = useCallback(
@@ -699,6 +710,29 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    */
   const [modo, ponerModo] = useState<ModoDelBurgo>('mesa');
   const aPie = modo !== 'mesa';
+  /*
+   * A PIE, EL TELÉFONO DE LADO (27-sep-2026, Miguel: «no se pone en horizontal la pantalla»): el gancho
+   * común bloquea en horizontal al bajar a andar y devuelve la orientación al volver a la mesa; en
+   * `/jugar` pide pantalla completa y bloqueo, o enseña «Gira el teléfono». Ver `a-pie-apaisado.tsx`.
+   */
+  const avisoDeGirar = usarAPieApaisado(aPie);
+  /* Volver a la mesa la saca: recogida sólo se está a pie. Ver «LA MESA RECOGIDA». */
+  useEffect(() => {
+    if (!aPie) ponerMesaRecogida(false);
+  }, [aPie]);
+  /*
+   * Y SALE SOLA CUANDO TE TOCA TIRAR, como la de Riberas (decisión 16: recoger es para MIRAR, y cuando hay
+   * que actuar la mesa vuelve). Es el FLANCO —poder tirar de falso a verdadero—, no el valor: recogerla
+   * con los dados ya por tirar la deja recogida hasta que se quiera. Hace falta aquí y no en la Sala:
+   * tumbado, el pie de esta pantalla no tiene alto para los botones sueltos (fotógrafo, 844 × 390, TIRAR
+   * quedaba debajo de la cinta), así que la puerta de tirar son los dados de la caja.
+   */
+  const porTirar = dados?.porTirar === true;
+  const podiaTirar = useRef(porTirar);
+  useEffect(() => {
+    if (porTirar && !podiaTirar.current) ponerMesaRecogida(false);
+    podiaTirar.current = porTirar;
+  }, [porTirar]);
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const camara = useMemo((): ModoDeCamara => (modo === 'mesa' ? CAMARA_DE_MESA : { modo, asiento: yo ?? '' }), [modo, yo]);
   /*
@@ -1535,6 +1569,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
                     canal={canal}
                     alRecoger={alRecoger}
                     bandejaDeLosDados={sitioDeLaBandeja}
+                    bandejaRecogida={mesaRecogida}
                     reloj={relojDeArena}
                     alPasarElTurno={alPasarElTurno}
                     seguirAlQueMueve={seguirAlQueMueve}
@@ -1676,6 +1711,24 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
               <MandosDelPaseo mandos={mandos} visibles={aPie} />
               {/* Y «GOLPEAR», a pie y sólo con canal, en la misma franja: fuera de ella el dedo no llega en Android. */}
               <BotonDeGolpear mandos={mandos} visible={aPie && canal !== undefined} />
+              {/*
+                «RECOGER LA MESA», A PIE: arriba a la derecha de la franja, encima del correr y del lado de
+                la caja que quita. El nombre dice lo que va a pasar al pulsarlo, como en Riberas.
+              */}
+              {aPie ? (
+                <Pressable
+                  style={[estilos.recoger, mesaRecogida ? estilos.recogerRecogida : null]}
+                  onPress={() => {
+                    laInterfazSeLoQueda();
+                    ponerMesaRecogida((r) => !r);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={mesaRecogida ? SACAR_LA_MESA : RECOGER_LA_MESA}
+                  accessibilityHint={mesaRecogida ? 'Vuelve a poner delante la caja con los dados, tu dinero y el reloj' : 'Quita de delante la caja con los dados y el reloj; tirar y pasar siguen abajo'}
+                >
+                  <Text style={[estilos.camaraRotulo, estilos.recogerRotulo]} numberOfLines={2}>{mesaRecogida ? `▲ ${SACAR_LA_MESA}` : `▼ ${RECOGER_LA_MESA}`}</Text>
+                </Pressable>
+              ) : null}
             </View>
             {elPie(fuera)}
           </View>
@@ -1683,6 +1736,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
       </View>
       {lasHojas()}
       {elCajon()}
+      {avisoDeGirar}
     </View>
   );
 }
@@ -1951,4 +2005,27 @@ const estilos = StyleSheet.create({
   camaraPuesta: { backgroundColor: SALA.blanco, borderColor: SALA.blanco },
   camaraRotulo: { ...LETRA.rotuloChico, color: SALA.blanco, fontSize: 13 },
   camaraRotuloPuesto: { ...LETRA.rotuloChico, color: SALA.suelo, fontSize: 13 },
+  /* «Recoger la mesa»: el cromo de las cámaras, arriba a la derecha de la franja andando, por encima del correr. */
+  /*
+   * Del ANCHO DEL CORRER (112) y justo encima de él: a su izquierda va «Golpear», que sube hasta 132 del
+   * pie, y un rótulo en una línea se le metía 58 puntos encima (fotógrafo, 844 × 390). En dos renglones.
+   */
+  recoger: {
+    position: 'absolute',
+    right: 16,
+    top: 0,
+    width: 112,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: RADIO.mando,
+    borderWidth: 1,
+    borderColor: conAlfa(SALA.blanco, 0.4),
+    backgroundColor: SALA.teja,
+  },
+  /* Recogida, con el filo del acento: hay que poder encontrarla para volver a sacarla. */
+  recogerRecogida: { borderColor: SALA.acento },
+  recogerRotulo: { textAlign: 'center', lineHeight: 16 },
 });

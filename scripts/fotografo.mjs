@@ -30,7 +30,11 @@
  *     "red": { "kbps": 1500, "latenciaMs": 300 },      // OPCIONAL: una red lenta (la de un móvil con datos)
  *     "fotosEnMs": [3000, 10000, 20000],               // OPCIONAL: fotos a esos instantes tras navegar
  *     "leerEnCadaFoto": "document.title",              // OPCIONAL: una expresión que se apunta con cada una
- *     "bloquear": ["*Quiebro-*.js"]                    // OPCIONAL: direcciones que no llegan (ver un fallo)
+ *     "bloquear": ["*Quiebro-*.js"],                   // OPCIONAL: direcciones que no llegan (ver un fallo)
+ *     "toquesDeclarados": 10                            // OPCIONAL: en los aparatos de ORDENADOR, declara esos
+ *                                                      //   puntos de toque (un portátil Windows con ratón y
+ *                                                      //   digitalizador) sin volverlo móvil: tiene que salir
+ *                                                      //   la interfaz de ordenador (`escenas/paseo/aparato.ts`)
  *   }
  *
  * Por cada tamaño deja `<tamaño>.png` y, en `informe.json`, lo medido en la página: el viewport que
@@ -106,7 +110,7 @@ const MEDIR = `(() => {
   const chicos = matchMedia('(pointer: coarse)').matches ? tocables.filter((e) => { const r = e.getBoundingClientRect(); return r.width < 44 && r.height < 44 && r.width > 0; }).map((e) => ({ que: nombre(e), caja: caja(e) })) : [];
   const cortados = [...document.querySelectorAll('body *')].filter((e) => visible(e) && e.children.length === 0 && (e.textContent || '').trim().length > 2 && (e.scrollWidth > e.clientWidth + 2) && getComputedStyle(e).overflow !== 'visible').map((e) => ({ que: nombre(e), caja: caja(e) })).slice(0, 30);
   const lienzos = [...document.querySelectorAll('canvas')].filter(visible).map((c) => ({ caja: caja(c) }));
-  return { viewport: { ancho: vw, alto: vh, dpr: devicePixelRatio, grueso: matchMedia('(pointer: coarse)').matches, toques: navigator.maxTouchPoints }, scroll: { ancho: document.documentElement.scrollWidth, alto: document.documentElement.scrollHeight }, lienzos, fuera: fuera.slice(0, 40), pisados: pisados.slice(0, 40), chicos: chicos.slice(0, 40), cortados };
+  return { viewport: { ancho: vw, alto: vh, dpr: devicePixelRatio, grueso: matchMedia('(pointer: coarse)').matches, toques: navigator.maxTouchPoints, mando: document.documentElement.dataset.mando ?? null, palanca: document.querySelectorAll('.mandos-tactiles-palanca, [aria-label="Palanca para andar"]').length }, scroll: { ancho: document.documentElement.scrollWidth, alto: document.documentElement.scrollHeight }, lienzos, fuera: fuera.slice(0, 40), pisados: pisados.slice(0, 40), chicos: chicos.slice(0, 40), cortados };
 })()`;
 
 function esperar(ms) {
@@ -215,6 +219,8 @@ async function main() {
         s,
       );
       if (a.movil) await cdp.mandar('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 5 }, s);
+      /* Un portátil con ratón que DECLARA toques: puntos de toque sin `mobile` ni agente de móvil. Ver la cabecera. */
+      else if (plan.toquesDeclarados) await cdp.mandar('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: plan.toquesDeclarados }, s);
       if (a.ua) await cdp.mandar('Emulation.setUserAgentOverride', { userAgent: a.ua, platform: a.ua.includes('iPhone') ? 'iPhone' : 'Linux armv8l' }, s);
       /* El almacén, sólo en el origen de la url y antes de que corra ningún guion de la página. */
       if (plan.almacen) {

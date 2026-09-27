@@ -233,6 +233,7 @@ import type { EstadoDelCanal } from '../../../escenas/paseo/canal-de-botas';
  */
 import { SIN_MANDOS_DE_FUERA } from '../../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../../escenas/paseo/mandos';
+import { usarAPieApaisado } from './a-pie-apaisado';
 import { MandosDelPaseo } from './mandos-del-paseo';
 import { BotonDeGolpear } from './mandos-del-paseo';
 /*
@@ -576,6 +577,12 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
    */
   const [modo, ponerModo] = useState<ModoDeCamaraDelDelta['modo']>('mesa');
   const aPie = modo !== 'mesa';
+  /*
+   * A PIE, EL TELÉFONO DE LADO (27-sep-2026, Miguel: «no se pone en horizontal la pantalla»): el gancho
+   * común bloquea en horizontal al bajar a andar y devuelve la orientación al volver a la mesa; en
+   * `/jugar` pide pantalla completa y bloqueo, o enseña «Gira el teléfono». Ver `a-pie-apaisado.tsx`.
+   */
+  const avisoDeGirar = usarAPieApaisado(aPie);
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const cambiarDeCamara = useCallback(
     (nuevo: ModoDeCamaraDelDelta['modo']) => {
@@ -1557,6 +1564,7 @@ function LaMesaEnTres({ mesa, vista, juego, nombres, abajo, laBarra }: LoQueVeEl
         */}
         <MandosDelPaseo mandos={mandos} visibles={aPie} />
         <BotonDeGolpear mandos={mandos} visible={aPie && canal !== undefined} />
+        {avisoDeGirar}
 
         {/*
           EL AVISO AL RECOGER, arriba: abajo son de la palanca, el correr y «Golpear». A pie arriba

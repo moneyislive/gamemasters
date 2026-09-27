@@ -2731,7 +2731,7 @@ paso(
       const c = soloCodigo(t);
       return (
         /const dados = useMemo\(\(\) => dadosEnTres\(laVista, yo, opciones\), \[laVista, yo, opciones\]\);/.test(c) &&
-        /opcionesFueraDelTablero\(opciones, datos, dados, cajonAbierto \? hoja : null, pregon, carril\)/.test(c) &&
+        /opcionesFueraDelTablero\(opciones, datos, mesaRecogida \? null : dados, cajonAbierto \? hoja : null, pregon, carril\)/.test(c) &&
         /from '\.\.\/\.\.\/\.\.\/shared\/arcade\/juegos\/burgo-en-tres'/.test(t)
       );
     },
@@ -2760,7 +2760,7 @@ paso(
       const laCaja = c.indexOf('const pregon = useMemo(() => pregonDelBurgo(laVista, yo, opciones)');
       const elCarril = c.indexOf('const carril = useMemo(() => carrilDelBurgo(laVista, yo, opciones)');
       const laHoja = c.indexOf('hojaEnTres(laVista, yo, opciones, pregon, carril)');
-      const laCriba = c.indexOf('opcionesFueraDelTablero(opciones, datos, dados,');
+      const laCriba = c.indexOf('opcionesFueraDelTablero(opciones, datos, mesaRecogida ? null : dados,');
       return laCaja >= 0 && elCarril > laCaja && laHoja > elCarril && laCriba > laHoja;
     },
     escena,
@@ -2786,15 +2786,15 @@ paso(
     (t) => {
       const c = soloCodigo(t);
       return (
-        /opcionesFueraDelTablero\(opciones, datos, dados, cajonAbierto \? hoja : null, pregon, carril\)/.test(c) &&
+        /opcionesFueraDelTablero\(opciones, datos, mesaRecogida \? null : dados, cajonAbierto \? hoja : null, pregon, carril\)/.test(c) &&
         /opcionesFueraDelTablero\(\s*sinElRetablo,\s*null,\s*null,\s*cajonAbierto \? hoja : null,\s*pregon,\s*carril,\s*\)/.test(c) &&
         /obrasSoloEnElAnillo\(opciones, datos, cajonAbierto \? hoja : null, carril\)/.test(c)
       );
     },
     escena,
     escena.replace(
-      'opcionesFueraDelTablero(opciones, datos, dados, cajonAbierto ? hoja : null, pregon, carril)',
-      'opcionesFueraDelTablero(opciones, datos, dados, hoja, pregon, carril)',
+      'opcionesFueraDelTablero(opciones, datos, mesaRecogida ? null : dados, cajonAbierto ? hoja : null, pregon, carril)',
+      'opcionesFueraDelTablero(opciones, datos, mesaRecogida ? null : dados, hoja, pregon, carril)',
     ),
     'una hoja dentro de un cajón cerrado no se pinta: contándola, lo que sólo enseña la hoja —las pujas de una subasta— se queda sin botón en toda la pantalla',
   );
@@ -4130,7 +4130,7 @@ paso('Boots on Board en la app: «Golpear» sólo a pie y con canal, con el toqu
 
   /* ── El botón ── */
   const elBoton = (t) =>
-    /export function BotonDeGolpear\(\{ mandos, visible \}: BotonDeGolpearProps\): JSX\.Element \| null \{([\s\S]*?)\n\}/.exec(soloCodigo(t))?.[1] ?? '';
+    /export function BotonDeGolpear\(\{ mandos, visible(?:: toca)? \}: BotonDeGolpearProps\): JSX\.Element \| null \{([\s\S]*?)\n\}/.exec(soloCodigo(t))?.[1] ?? '';
   regla(
     '«Golpear» se pulsa con el toque EN CRUDO —`onTouchStart`, que llega aunque la palanca sea el respondedor—, sin `Pressable` ni `onClick`, cuenta un golpe más sin tocar lo demás, y el lector de pantalla lo activa',
     (t) => {
@@ -4555,6 +4555,153 @@ paso('A pie en la app: el aviso al recoger en los tres juegos, la forja de Riber
     aPie,
     [aPie.replace('${String(ESCUDOS_POR_LEVA)} escudos', '3 escudos')],
     'un tres escrito aquí y otro en el reductor se separan el día que la leva cambie de precio',
+  );
+}
+
+paso('A pie en la app: el teléfono de lado en los tres juegos, la palanca sólo con el dedo en `/jugar`, y «Recoger la mesa» en El Burgo');
+{
+  /*
+   * ═══ LO QUE VIO MIGUEL EL 27-SEP ═══
+   *
+   *   · «En la app aparecen los controles pero no se pone en horizontal la pantalla»: el gancho común
+   *     `usarAPieApaisado` (`a-pie-apaisado.tsx`) bloquea en `LANDSCAPE` al bajar a andar y, al volver a
+   *     «La mesa», devuelve la orientación —nunca suelta: la app giraría con el sensor—. Montado en las
+   *     tres pantallas que se andan, con la MISMA condición con la que salen la palanca y el correr.
+   *   · «En la versión web aparecen los controles de joystick y correr»: en `/jugar` abierto en un
+   *     ordenador la palanca sobra. `MandosDelPaseo` y `BotonDeGolpear` preguntan `usarAparatoTactil`
+   *     (en el teléfono, siempre sí; en la web, el almacén único de `escenas/paseo/aparato.ts`, que
+   *     nunca decide con `maxTouchPoints` solo).
+   *   · «No hay botón para esconder la mesa con los dados y el reloj»: en El Burgo, a pie, «Recoger la
+   *     mesa» quita la caja de la escena (`bandejaRecogida`) y devuelve TIRAR a los botones del pie.
+   */
+  const soloCodigo = (texto) =>
+    texto
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:'"`])\/\/[^\n]*/g, '$1');
+  const regla = (que, prueba, bueno, envenenados, porque) => {
+    comprobar(que, prueba(bueno), porque);
+    envenenados.forEach((envenenado, i) => {
+      comprobar(
+        `y «${que}» se ve CAER con el caso envenenado ${String(i + 1)}`,
+        envenenado !== bueno && !prueba(envenenado),
+        envenenado === bueno ? 'el envenenado no ha cambiado el fichero: la regla no se está poniendo a prueba' : porque,
+      );
+    });
+  };
+
+  /* ── El gancho: de lado a pie, y a la mesa devuelve ── */
+  const gancho = leer(path.join(SRC, 'arcade', 'a-pie-apaisado.tsx'));
+  regla(
+    'el gancho apaisado bloquea en `LANDSCAPE` sólo a pie y, al volver a la mesa, devuelve el bloqueo de antes o `PORTRAIT_UP` (nunca suelta)',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /export function usarAPieApaisado\(aPie: boolean\)/.test(c) &&
+        /if \(!aPie\) return undefined;/.test(c) &&
+        /ScreenOrientation\.lockAsync\(ScreenOrientation\.OrientationLock\.LANDSCAPE\)/.test(c) &&
+        /return \(\) => \{[\s\S]*?ScreenOrientation\.lockAsync\(bloqueoAlVolverALaMesa\(antes\)\)/.test(c) &&
+        /return libre \? ScreenOrientation\.OrientationLock\.PORTRAIT_UP : antes;/.test(c) &&
+        !/unlockAsync/.test(c) &&
+        /\}, \[aPie\]\);/.test(c)
+      );
+    },
+    gancho,
+    [
+      gancho.replace('if (!aPie) return undefined;', ''),
+      gancho.replace('ScreenOrientation.lockAsync(bloqueoAlVolverALaMesa(antes))', 'ScreenOrientation.unlockAsync()'),
+    ],
+    'sin la condición el teléfono se tumbaría también en la mesa; soltando al volver, la app se queda girando con el sensor',
+  );
+  const web = leer(path.join(SRC, 'arcade', 'a-pie-apaisado.web.tsx'));
+  regla(
+    'en `/jugar` el gancho pide el lado sólo con el dedo, y su aviso «Gira el teléfono» se puede quitar («Seguir de pie»)',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const activo = aPie && tactil;/.test(c) &&
+        /pedirDeLado\(\)/.test(c) &&
+        /soltarElLado\(puso\.current\)/.test(c) &&
+        /onPress=\{\(\) => ponerSeguirDePie\(true\)\}/.test(c) &&
+        /\{SEGUIR_DE_PIE\}/.test(c)
+      );
+    },
+    web,
+    [web.replace('const activo = aPie && tactil;', 'const activo = aPie;'), web.replace('onPress={() => ponerSeguirDePie(true)}', '')],
+    'en un ordenador se pediría pantalla completa sin preguntar; y un aviso que no se quita tapa el juego a quien no puede girar el teléfono',
+  );
+
+  /* ── Montado en las tres, con la condición de la palanca ── */
+  const pantallas = [
+    ['el Burgo', leer(path.join(SRC, 'arcade', 'burgo-en-tres-escena.tsx')), 'aPie'],
+    ['Riberas', leer(path.join(SRC, 'arcade', 'riberas-en-tres-escena.tsx')), 'aPie'],
+    ['Las Lindes', leer(path.join(SRC, 'arcade', 'lindes-en-tres-escena.tsx')), "modo !== 'mesa'"],
+  ];
+  const aLaLetra = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const montaElGancho = (t, cond) => {
+    const c = soloCodigo(t);
+    return (
+      /import \{ usarAPieApaisado \} from '\.\/a-pie-apaisado';/.test(c) &&
+      new RegExp(`const avisoDeGirar = usarAPieApaisado\\(${aLaLetra(cond)}\\);`).test(c) &&
+      new RegExp(`<MandosDelPaseo mandos=\\{mandos\\} visibles=\\{${aLaLetra(cond)}\\} />`).test(c) &&
+      /\{avisoDeGirar\}/.test(c)
+    );
+  };
+  for (const [nombre, t, cond] of pantallas) {
+    regla(
+      `${nombre}: a pie monta el gancho apaisado con la condición de la palanca, y pinta su aviso`,
+      (x) => montaElGancho(x, cond),
+      t,
+      [t.replace(`const avisoDeGirar = usarAPieApaisado(${cond});`, 'const avisoDeGirar = usarAPieApaisado(true);'), t.replace('{avisoDeGirar}', '')],
+      'con `true` el teléfono se tumbaría también en la mesa y no se liberaría al volver; sin pintarlo, en `/jugar` el aviso no sale nunca',
+    );
+  }
+
+  /* ── La palanca, sólo con el dedo ── */
+  const mandos = leer(path.join(SRC, 'arcade', 'mandos-del-paseo.tsx'));
+  const tactilWeb = leer(path.join(SRC, 'arcade', 'aparato-tactil.web.ts'));
+  regla(
+    'la palanca, el correr y «Golpear» salen a pie Y con el dedo: en `/jugar` abierto en un ordenador, no',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const visibles = aPie && tactil;/.test(c) &&
+        /const tactil = usarAparatoTactil\(\);[^\n]*\n\s*const visible = toca && tactil;/.test(c) &&
+        /* El gancho, siempre: detrás de un «&&» cambiaba el orden de los ganchos y «/jugar» reventaba (27-sep). */
+        !/&& usarAparatoTactil\(\)/.test(c) &&
+        /import \{ usarAparatoTactil \} from '\.\/aparato-tactil';/.test(c) &&
+        /useSyncExternalStore\(suscribirAlMando, mandoActual, mandoSinVentana\) === 'dedo'/.test(tactilWeb) &&
+        !/maxTouchPoints|pointer: coarse/.test(soloCodigo(tactilWeb))
+      );
+    },
+    mandos,
+    [mandos.replace('const visibles = aPie && tactil;', 'const visibles = aPie;'), mandos.replace('const visible = toca && tactil;', 'const visible = toca;'), mandos.replace('const visible = toca && tactil;', 'const visible = toca && usarAparatoTactil();')],
+    'sin preguntar, el ordenador de Miguel vuelve a pintar la palanca y el correr encima de la calle',
+  );
+
+  /* ── «Recoger la mesa» en El Burgo ── */
+  const burgo = pantallas[0][1];
+  regla(
+    'El Burgo, a pie: «Recoger la mesa» quita la caja y el reloj de la escena, devuelve TIRAR al pie, y volver a la mesa la saca',
+    (t) => {
+      const c = soloCodigo(t);
+      return (
+        /const \[mesaRecogida, ponerMesaRecogida\] = useState\(false\);/.test(c) &&
+        /if \(!aPie\) ponerMesaRecogida\(false\);/.test(c) &&
+        /if \(porTirar && !podiaTirar\.current\) ponerMesaRecogida\(false\);/.test(c) &&
+        /bandejaRecogida=\{mesaRecogida\}/.test(c) &&
+        /opcionesFueraDelTablero\(opciones, datos, mesaRecogida \? null : dados,/.test(c) &&
+        /\{aPie \? \(\s*<Pressable\s+style=\{\[estilos\.recoger/.test(c) &&
+        /accessibilityLabel=\{mesaRecogida \? SACAR_LA_MESA : RECOGER_LA_MESA\}/.test(c)
+      );
+    },
+    burgo,
+    [
+      burgo.replace('bandejaRecogida={mesaRecogida}', ''),
+      burgo.replace('opcionesFueraDelTablero(opciones, datos, mesaRecogida ? null : dados,', 'opcionesFueraDelTablero(opciones, datos, dados,'),
+      burgo.replace('if (porTirar && !podiaTirar.current) ponerMesaRecogida(false);', ''),
+    ],
+    'sin decírselo a la escena la caja seguiría delante; sin devolver TIRAR, con la mesa recogida no se podría tirar en ninguna parte; y tumbado, sin sacarla sola al tocarte tirar, TIRAR queda bajo la cinta',
   );
 }
 

@@ -110,6 +110,7 @@ import {
   MandosTactiles,
   palancaDelArrastre,
 } from '../src/mandos-tactiles';
+import { CALMA_TRAS_UN_TOQUE, esTeclaDeAndar, mandoTrasElUso } from '../../escenas/paseo/aparato';
 import {
   fraseDelHallazgo,
   LaForja,
@@ -274,6 +275,8 @@ import {
   EL_CARTEL_EN_BLANCO,
   LAS_CAMARAS_DEL_BURGO,
   LasCamarasDelBurgo,
+  RECOGER_LA_MESA as RECOGER_LA_MESA_DEL_BURGO,
+  SACAR_LA_MESA as SACAR_LA_MESA_DEL_BURGO,
   loQueDiceLaCinta,
   sinLaFraseDelTurno,
   loQueHaceElToque,
@@ -2216,14 +2219,74 @@ function losAvataresJugablesEnLaSala(): void {
     !reglasDeLaReferencia((a, p) => ({ ...SIN_MANDOS_DE_FUERA, palanca: p, deprisa: a.deprisa }), conElCorrer, conUnGolpeMas),
   );
 
-  /* ── 3. Qué es un aparato táctil ── */
+  /*
+   * ── 3. Qué es un aparato táctil (27-sep-2026) ──
+   *
+   * Miguel vio la palanca y «Correr» en su ORDENADOR: la regla vieja era «`(pointer: coarse)` o
+   * `maxTouchPoints > 0`», y un Windows con ratón da 10 puntos de toque —y éste, además, `coarse`—.
+   * Ahora: dedo sólo con el dedo como puntero principal en un sistema que no es de ordenador, y luego
+   * manda el uso. Con los agentes de usuario de verdad de cada caso.
+   */
+  const WINDOWS = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36 Edg/128.0.0.0';
+  const ANDROID = 'Mozilla/5.0 (Linux; Android 14; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Mobile Safari/537.36';
+  const IPHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1';
+  const MAC = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15';
   const tactilBien = (f: typeof esAparatoTactil): boolean =>
-    !f({ punteroGrueso: false, puntosDeToque: 0 }) &&
-    !f({ punteroGrueso: false, puntosDeToque: undefined }) &&
-    f({ punteroGrueso: true, puntosDeToque: 0 }) &&
-    f({ punteroGrueso: false, puntosDeToque: 5 });
-  comprobar('táctil es puntero grueso o algún punto de toque; un ratón a secas, no', tactilBien(esAparatoTactil));
-  comprobar('se ve fallar: mirando sólo el puntero grueso, cae', !tactilBien((a) => a.punteroGrueso));
+    /* El portátil de Miguel: ratón, 10 puntos de toque, y ni con `coarse` ni sin él. */
+    !f({ dedoPrincipal: false, agente: WINDOWS, puntosDeToque: 10 }) &&
+    !f({ dedoPrincipal: true, agente: WINDOWS, puntosDeToque: 10 }) &&
+    !f({ dedoPrincipal: false, agente: MAC, puntosDeToque: 0 }) &&
+    /* Una tableta Android con ratón enganchado: el puntero principal ya no es el dedo. */
+    !f({ dedoPrincipal: false, agente: ANDROID, puntosDeToque: 5 }) &&
+    f({ dedoPrincipal: true, agente: ANDROID, puntosDeToque: 5 }) &&
+    f({ dedoPrincipal: true, agente: IPHONE, puntosDeToque: 5 }) &&
+    /* Un iPad se presenta como Mac: lo delatan sus puntos de toque, y sólo junto al agente. */
+    f({ dedoPrincipal: true, agente: MAC, puntosDeToque: 5 });
+  comprobar(
+    'táctil es el dedo como puntero principal en un sistema que no es de ordenador: un Windows con ratón y 10 puntos de toque (y hasta con `coarse`) NO; Android, iPhone y el iPad que dice Mac, sí',
+    tactilBien(esAparatoTactil),
+  );
+  comprobar(
+    'se ve fallar: la regla vieja («`coarse` o `maxTouchPoints`»), los puntos de toque solos, o `coarse` solo, caen',
+    !tactilBien((a) => a.dedoPrincipal || (a.puntosDeToque ?? 0) > 0) &&
+      !tactilBien((a) => (a.puntosDeToque ?? 0) > 0) &&
+      !tactilBien((a) => a.dedoPrincipal),
+  );
+  /* Y luego manda el uso: un toque pasa a dedo; el ratón (pasada la calma del toque) o una tecla de andar, a teclado. */
+  const usoBien = (f: typeof mandoTrasElUso): boolean =>
+    f('raton', { que: 'toque', cuando: 1000 }, 1000) === 'dedo' &&
+    f('dedo', { que: 'raton', cuando: 1000 + CALMA_TRAS_UN_TOQUE / 2 }, 1000) === 'dedo' &&
+    f('dedo', { que: 'raton', cuando: 1000 + CALMA_TRAS_UN_TOQUE * 2 }, 1000) === 'raton' &&
+    f('dedo', { que: 'tecla', tecla: 'w', cuando: 5000 }, 1000) === 'raton' &&
+    f('dedo', { que: 'tecla', tecla: 'Shift', cuando: 5000 }, 1000) === 'raton' &&
+    f('dedo', { que: 'tecla', tecla: 'x', cuando: 5000 }, 1000) === 'dedo';
+  comprobar(
+    'en vivo: un toque pasa a dedo, mover el ratón o pulsar W/Mayúsculas pasa a teclado, y el ratón sintético de detrás de un toque no hace parpadear la palanca',
+    usoBien(mandoTrasElUso),
+  );
+  comprobar(
+    'se ve fallar: sin la calma tras el toque (la palanca se encendería y apagaría en cada toque), o con cualquier tecla, cae',
+    !usoBien((a, u) => (u.que === 'toque' ? 'dedo' : u.que === 'raton' ? 'raton' : esTeclaDeAndar(u.tecla) ? 'raton' : a)) &&
+      !usoBien((a, u) => (u.que === 'toque' ? 'dedo' : u.que === 'tecla' ? 'raton' : mandoTrasElUso(a, u, 1000))),
+  );
+  /* Nadie más decide el táctil por su cuenta: ni los pintores ni la pantalla completa miran el aparato. */
+  const quienesPreguntan = (['mandos-tactiles.tsx', 'pantalla-completa.tsx', 'burgo-en-tres.tsx', 'riberas-en-tres.tsx', 'lindes-en-tres.tsx', 'a-pie-en-botas.tsx'] as const).map(
+    (f): [string, string] => [f, sinComentarios(readFileSync(new URL(`../src/${f}`, import.meta.url), 'utf8'))],
+  );
+  const preguntanPorSuCuenta = (ps: readonly [string, string][]): string[] =>
+    ps.filter(([, t]) => /maxTouchPoints|pointer:\s*coarse|hover:\s*none/.test(t)).map(([f]) => f);
+  comprobar(
+    'ni la palanca, ni la pantalla completa, ni los tres pintores miran `maxTouchPoints` o `(pointer: coarse)`: preguntan al almacén único (`escenas/paseo/aparato.ts`)',
+    preguntanPorSuCuenta(quienesPreguntan).length === 0 &&
+      /useSyncExternalStore\(suscribirAlMando, mandoActual, mandoSinVentana\)/.test(quienesPreguntan[0]?.[1] ?? '') &&
+      /usarLaPeticionAlPrimerToque\(hay && tactil\)/.test(quienesPreguntan[1]?.[1] ?? '') &&
+      /e\.pointerType !== 'touch'/.test(quienesPreguntan[1]?.[1] ?? ''),
+    preguntanPorSuCuenta(quienesPreguntan),
+  );
+  comprobar(
+    'se ve fallar: un pintor que volviera a mirar `navigator.maxTouchPoints`, cae',
+    preguntanPorSuCuenta(quienesPreguntan.map(([f, t]): [string, string] => [f, f === 'burgo-en-tres.tsx' ? `${t}\nconst t = navigator.maxTouchPoints > 0;` : t])).length === 1,
+  );
 
   /* ── 4. Los mandos pintados: nada si no tocan, la palanca y el correr a pie, y Golpear sólo con canal ── */
   const ref = { current: SIN_MANDOS_DE_FUERA };
@@ -2249,12 +2312,11 @@ function losAvataresJugablesEnLaSala(): void {
     /onPointerDown=\{alBajarEnLaPalanca\}/.test(t) &&
     /onPointerCancel=\{alSoltarLaPalanca\}/.test(t) &&
     /onLostPointerCapture=\{alSoltarLaPalanca\}/.test(t) &&
-    /'\(pointer: coarse\)'/.test(t) &&
-    /maxTouchPoints/.test(t) &&
-    /mandos\.current = SIN_MANDOS_DE_FUERA;/.test(t) &&
-    /addEventListener\('change', mirar\)/.test(t);
+    /useSyncExternalStore\(suscribirAlMando, mandoActual, mandoSinVentana\)/.test(t) &&
+    !/maxTouchPoints/.test(t) &&
+    /mandos\.current = SIN_MANDOS_DE_FUERA;/.test(t);
   comprobar(
-    'la palanca coge su dedo (`setPointerCapture`) y lo suelta al cancelarse; el táctil se decide con `(pointer: coarse)` o `maxTouchPoints` y escucha si cambia; al dejar de andar, todo suelto',
+    'la palanca coge su dedo (`setPointerCapture`) y lo suelta al cancelarse; el táctil lo dice el almacén único, que escucha si cambia (y nunca `maxTouchPoints` aquí); al dejar de andar, todo suelto',
     cogeSuDedo(fuenteDeLosMandos),
   );
   comprobar(
@@ -3560,7 +3622,7 @@ function elBurgoAPie(): void {
     /const \[modo, ponerModo\] = useState<ModoDelBurgo>\('mesa'\);/.test(c) &&
     /const camara = useMemo\(\(\): ModoDeCamara => \(modo === 'mesa' \? \{ modo: 'mesa' \} : \{ modo, asiento: yo \?\? '' \}\), \[modo, yo\]\);/.test(c) &&
     /<Burgo\n(?:(?!\/>)[\s\S])*camara=\{camara\}/.test(c) &&
-    /<LasCamarasDelBurgo\s+modo=\{modo\}\s+alElegir=\{ponerModo\}\s+conCarril=\{cuadrados\.length > 0\}\s+canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\}\s+tactil=\{tactil\}\s*\/>/.test(c) &&
+    /<LasCamarasDelBurgo\s+modo=\{modo\}\s+alElegir=\{ponerModo\}\s+conCarril=\{cuadrados\.length > 0\}\s+canal=\{esBotas \? \(estadoDelCanal\?\.texto \?\? 'Conectando…'\) : undefined\}\s+tactil=\{tactil\}\s+recogida=\{aPie && conMundo \? mesaRecogida : null\}\s+alRecogerLaMesa=\{\(\) => ponerMesaRecogida\(\(r\) => !r\)\}\s*\/>/.test(c) &&
     c.indexOf('<LasCamarasDelBurgo') > c.indexOf('</LimiteDelMundo>') &&
     /const cual = camaraDeLaTecla\(e, document\.activeElement\);/.test(c) &&
     /\{alPrincipio \|\| aPie \? null : \(/.test(c);
@@ -3570,6 +3632,44 @@ function elBurgoAPie(): void {
     !montaLoDeAPie(pintor.replace(/camara=\{camara\}/, "camara={{ modo: 'mesa' }}")) &&
       !montaLoDeAPie(pintor.replace('{alPrincipio || aPie ? null : (', '{alPrincipio ? null : (')) &&
       !montaLoDeAPie(pintor.replace("canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined}", "canal={estadoDelCanal?.texto ?? 'Conectando…'}")),
+  );
+
+  /*
+   * «RECOGER LA MESA», A PIE (27-sep-2026). Miguel: «no hay botón para esconder la mesa con los dados y
+   * el reloj». El botón sale a pie con las palabras de Riberas; recogida, la escena no pinta ni toca la
+   * caja (`bandejaRecogida`) y TIRAR vuelve al carril —la criba recibe `null` en vez de los dados—, que
+   * sin eso tirar se quedaría sin ninguna puerta. Volver a la mesa la saca.
+   */
+  const recogeLaMesa = (c: string): boolean =>
+    /const \[mesaRecogida, ponerMesaRecogida\] = useState\(false\);/.test(c) &&
+    /const recogida = aPie && mesaRecogida;/.test(c) &&
+    /if \(!aPie\) ponerMesaRecogida\(false\);/.test(c) &&
+    /conMundo && !recogida \? dados : null,/.test(c) &&
+    /\{dados !== null && !recogida \? \(/.test(c) &&
+    /<Burgo\n(?:(?!\/>)[\s\S])*bandejaRecogida=\{recogida\}/.test(c);
+  comprobar('a pie, «Recoger la mesa» quita la caja y el reloj (y sus toques), y TIRAR vuelve al carril; volver a la mesa la saca', recogeLaMesa(pintor));
+  comprobar(
+    'se ve fallar: una mesa recogida que siguiera quitando TIRAR del carril (tirar sin ninguna puerta), o una escena que no se enterara, cae',
+    !recogeLaMesa(pintor.replace('conMundo && !recogida ? dados : null,', 'conMundo ? dados : null,')) &&
+      !recogeLaMesa(pintor.replace('bandejaRecogida={recogida}', '')),
+  );
+  const botonesDeRecoger = (f: typeof LasCamarasDelBurgo): readonly string[] =>
+    ([null, false, true] as const).map((r) =>
+      renderToStaticMarkup(f({ modo: 'hombro', alElegir: () => undefined, conCarril: false, recogida: r, alRecogerLaMesa: () => undefined })),
+    );
+  const recogerBien = ([enLaMesa, puesta, recogida]: readonly string[]): boolean =>
+    RECOGER_LA_MESA_DEL_BURGO === 'Recoger la mesa' &&
+    SACAR_LA_MESA_DEL_BURGO === 'Sacar la mesa' &&
+    !/burgo-recoger/.test(enLaMesa ?? '') &&
+    (puesta ?? '').includes(RECOGER_LA_MESA_DEL_BURGO) &&
+    !(puesta ?? '').includes(SACAR_LA_MESA_DEL_BURGO) &&
+    (recogida ?? '').includes(SACAR_LA_MESA_DEL_BURGO) &&
+    /burgo-recoger-recogida/.test(recogida ?? '');
+  comprobar('el botón dice lo que va a pasar: «Recoger la mesa» con la caja delante, «Sacar la mesa» recogida, y en la mesa no existe', recogerBien(botonesDeRecoger(LasCamarasDelBurgo)));
+  comprobar(
+    'se ve fallar: un botón que en la mesa también saliera, o que dijera siempre lo mismo, cae',
+    !recogerBien(botonesDeRecoger(LasCamarasDelBurgo).map((h, i) => (i === 0 ? `${h}burgo-recoger` : h))) &&
+      !recogerBien(botonesDeRecoger(LasCamarasDelBurgo).map((h, i) => (i === 2 ? h.replace(SACAR_LA_MESA_DEL_BURGO, RECOGER_LA_MESA_DEL_BURGO) : h))),
   );
 
   /* ── 5. LA HOJA: SU SITIO, Y QUE NO SE COMA EL PUNTERO ── */
@@ -13253,9 +13353,20 @@ function laSalaEnElTelefono(): void {
     /\.muelle-hoja\s*\{[^}]*width:\s*100%/.test(estrecho),
   );
   comprobar(
-    'con el dedo, el botón de pantalla completa y los botones cortos del raíl miden 44 puntos',
-    /@media \(pointer: coarse\) \{\s*\.pantalla-completa \{\s*width: 44px;\s*height: 44px;/.test(hoja) &&
-      /@media \(pointer: coarse\) \{\s*\.muelle-rail \.opcion-corta \{\s*min-height: 44px;/.test(hoja),
+    'con el dedo (`data-mando`, la marca del almacén único), el botón de pantalla completa y los botones cortos del raíl miden 44 puntos',
+    /:root\[data-mando='dedo'\] \.pantalla-completa \{\s*width: 44px;\s*height: 44px;/.test(hoja) &&
+      /:root\[data-mando='dedo'\] \.muelle-rail \.opcion-corta \{\s*min-height: 44px;/.test(hoja),
+  );
+  /*
+   * UNA SOLA FUENTE DE VERDAD PARA «CON EL DEDO» (27-sep-2026): la palanca salía en el ordenador de
+   * Miguel porque la hoja y los mandos preguntaban cada uno lo suyo, y `(pointer: coarse)` casa en un
+   * Windows con ratón. La hoja no puede volver a preguntarlo por su cuenta.
+   */
+  const hojaSinCoarse = (h: string): boolean => !/@media[^{]*\(\s*pointer:\s*coarse\s*\)/.test(h) && /:root\[data-mando='dedo'\]/.test(h);
+  comprobar('la hoja de la Sala no pregunta `(pointer: coarse)`: «con el dedo» es `:root[data-mando=\'dedo\']`', hojaSinCoarse(hoja));
+  comprobar(
+    'se ve fallar: una regla nueva con `@media (pointer: coarse)`, cae',
+    !hojaSinCoarse(`${hoja}\n@media (pointer: coarse) {\n  .x {\n    min-height: 44px;\n  }\n}\n`),
   );
 }
 

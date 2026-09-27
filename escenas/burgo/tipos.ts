@@ -177,6 +177,14 @@ export interface PropsDelBurgo extends PropsDeEscenaDeTablero<ModoDeCamara> {
    */
   readonly bandejaDeLosDados?: SitioDeLaBandeja;
   /**
+   * LA MESA RECOGIDA: sin la caja ni el reloj delante, como «Recoger la mesa» de Riberas. Miguel, andando
+   * por el Burgo (27-sep-2026): «no hay botón para esconder la mesa con los dados y el reloj». Recogida
+   * no se pinta Y NO SE TOCA —las asas de los dados y del reloj y la caja que para los toques se
+   * desmontan: un asa invisible seguiría cogiendo el dedo (memoria «visible no quita el toque»)—, y el
+   * cliente devuelve TIRAR a sus botones y enseña el dinero en su cinta. Sin él, la caja está.
+   */
+  readonly bandejaRecogida?: boolean;
+  /**
    * EL RELOJ DE ARENA DEL TURNO, como en Riberas (`escenas/reloj.tsx`): cuándo empezó el turno, cuándo
    * vence, si se puede pasar y la vuelta que lo voltea. Sin él, el reloj se pinta lleno y quieto y no
    * pasa nada al tocarlo.
