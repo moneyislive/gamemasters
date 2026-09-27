@@ -184,7 +184,11 @@ export function UltimoFallo(): JSX.Element | null {
     <View style={estilos.telon} pointerEvents="box-none">
       <PantallaDelFallo
         fallo={fallo}
-        titulo="La última vez la app se cerró por esto"
+        /*
+         * «Se cerró» sólo si fue fatal de verdad: un fallo que `CazaFallos` o un pintor recogieron sin
+         * cerrar la app también se guarda aquí, y decir que se cerró cuando no lo hizo asusta sin razón.
+         */
+        titulo={fallo.fatal ? 'La última vez la app se cerró por esto' : 'La última vez algo falló, pero la app siguió'}
         alCerrar={() => {
           void almacen.borrar();
           ponerFallo(null);
