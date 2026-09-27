@@ -59,15 +59,22 @@
  *    había nadie a quien poner, se nacía donde dice el mundo y el primer tic salía de otro sitio,
  *    que el servidor devolvería con un `corrige`. Ahora el sitio se guarda y se nace en él.
  *  · SI AHÍ NO SE CABE, SE APARTA AL SITIO LIBRE MÁS CERCANO (`mudarDeMundo`). El servidor valida
- *    contra la ESTRUCTURA del mundo y el aparato anda con estructura y ADORNO: un sitio bueno para
- *    el servidor puede caer dentro de un barril de aquí, y desde dentro de una caja el paso no deja
- *    salir. En Las Lindes no pasa —su reparto entero es estructura—; en el Burgo y en Riberas sí.
+ *    contra la ESTRUCTURA del mundo, y un aparato que anduviera con estructura y ADORNO podría
+ *    recibir un sitio bueno para el servidor dentro de un barril suyo, y desde dentro de una caja el
+ *    paso no deja salir. Hoy los tres juegos que se andan le dan al paseo la MISMA estructura que el
+ *    servidor (`mundoDelBurgo`, `mundoDeRiberas`, `mundoDeLasLindes`) y el adorno se atraviesa, así
+ *    que esto no salta; queda como red, y además cada tic rescata a quien empiece dentro de algo
+ *    (`ticDelPaseo`, en `paseante.ts`).
  *
  * ═══ Y LA CÁMARA DE HOMBRO NO ATRAVIESA ═══
  *
  * Cada fotograma se mira hasta dónde cabe detrás de quien pasea (`hastaDondeCabeElHombro`) y la
  * cámara se acerca o se aleja hacia eso sin saltar (`acercarElHombro`). El porqué y los números
  * están en `camaras.ts`.
+ *
+ * Y si el juego declara lo que ESTORBA A LA VISTA (`estorbos`, ver `estorbos.ts`), también hasta
+ * dónde puede irse sin que el adorno se le ponga delante (`hastaDondeNoTapa`), y manda el menor. La
+ * arena es sólo estructura: sin esto la cámara se quedaba detrás de una señal de tráfico del Burgo.
  *
  * ═══ LA REFRIEGA: LA G, EL BOTÓN, Y EL SUELO ═══
  *
@@ -89,7 +96,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { arenaDe } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
-import { acercarElHombro, camaraDeHombro, camaraDeOjos, hastaDondeCabeElHombro } from './camaras';
+import { acercarElHombro, camaraDeHombro, camaraDeOjos, hastaDondeCabeElHombro, hastaDondeNoTapa } from './camaras';
+import type { EstorbosDelPaseo } from './estorbos';
 import { esTeclaDeOtro, esUnGolpe, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
 import type { DestinoDeLaTecla, EntradaDelTic, MandosDeFuera, Teclas } from './mandos';
 import { corregirElPaseo, fotogramaDeQuienPasea, mudarDeMundo, nacerEnElPaseo, poseDelPaseo } from './paseante';
@@ -131,6 +139,11 @@ export interface OpcionesDelPaseo {
   readonly alturaEn: (x: number, z: number) => number;
   /** Y en cuál se apoya la cámara de a pie, si no es la misma. Si no se da, la del suelo. */
   readonly alturaDeLaCamaraEn?: (x: number, z: number) => number;
+  /**
+   * Lo que estorba a la VISTA: el adorno con su altura, ya indexado (`estorbos.ts`). No choca ni
+   * viaja: sólo aparta la cámara de hombro de lo que se le pondría delante. Sin él, sólo la arena.
+   */
+  readonly estorbos?: EstorbosDelPaseo | null;
   /** La costura (a) con la red: lo pedido en cada tic y dónde se acabó. */
   readonly alDarUnTic?: (entrada: EntradaDelTic, sitio: Andante) => void;
   /**
@@ -289,7 +302,12 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
      * salirse del suelo. Se mira desde el sitio PINTADO, que es donde está la figura que se sigue.
      */
     let atras: number | null = null;
-    if (o.modo !== 'ojos') atras = acercarElHombro(atrasDelHombro.current, hastaDondeCabeElHombro(arena, p), dt);
+    if (o.modo !== 'ojos') {
+      /* Y sin quedarse detrás del adorno que el juego declare: el menor de los dos (ver `camaras.ts`). */
+      const cabe = hastaDondeCabeElHombro(arena, p);
+      const noTapa = o.estorbos === undefined || o.estorbos === null ? cabe : hastaDondeNoTapa(o.estorbos, p, suelo, cabe, y);
+      atras = acercarElHombro(atrasDelHombro.current, Math.min(cabe, noTapa), dt);
+    }
     atrasDelHombro.current = atras;
     const c = atras === null ? camaraDeOjos(p, suelo) : camaraDeHombro(p, suelo, atras);
     camera.position.set(c.x, c.y, c.z);

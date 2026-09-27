@@ -30,12 +30,25 @@
  * La arena es plana y un cuerpo no tiene altura (ver `mundo.ts`), así que la cámara también se
  * acerca detrás de algo bajo que, a su altura, pasaría por encima: un almiar, un seto. Es el precio
  * de preguntarle al mismo mundo con el que se choca en vez de inventar otro; no se atraviesa nada.
+ *
+ * ═══ Y TAMPOCO SE QUEDA DETRÁS DEL ADORNO ═══
+ *
+ * La arena es la estructura y nada más: el adorno —farolas, semáforos, árboles, coches aparcados—
+ * no está en ella, porque un paseante lo atraviesa y el servidor no sabe de él. Así que la cámara
+ * tampoco lo veía, y jugando al Burgo el 27-sep-2026 se quedó detrás de una señal de tráfico que
+ * tapaba media pantalla, y luego detrás de un semáforo. Ahora el juego puede DECLARAR lo que estorba
+ * a la vista (`estorbos.ts`: cajas con altura, a rodajas) y la cámara, además de lo que cabe en la
+ * arena, mira hasta dónde puede irse sin que ninguna caja se ponga entre ella y el pecho de quien
+ * pasea (`hastaDondeNoTapa`). Se queda con el menor de los dos y lo alcanza igual, con
+ * `acercarElHombro`: se acerca deprisa ante la señal y se aleja despacio al dejarla atrás.
  */
 import { RADIO_DEL_PASEANTE } from '../../shared/mecanicas/andar';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena } from '../../shared/mecanicas/mundo';
 import { ALTURA_DE_UNA_PERSONA } from '../escala';
+import { tapaLaVista } from './estorbos';
+import type { EstorbosDelPaseo } from './estorbos';
 
 /** A qué altura van los ojos sobre el suelo que se pisa. */
 export const ALTURA_DE_LOS_OJOS = ALTURA_DE_UNA_PERSONA * 0.92;
@@ -171,6 +184,55 @@ export function hastaDondeCabeElHombro(arena: Arena, quien: QuienSeMira, lejos =
     const x = deNumero(quien.x + haciaAtrasX * d);
     const z = deNumero(quien.z + haciaAtrasZ * d);
     if (!sePuedeEstar(arena, x, z, radio)) return libre;
+    libre = d;
+  }
+  return libre;
+}
+
+/* ─── Y tampoco se queda detrás del adorno ───────────────────────────────── */
+
+/**
+ * A QUÉ ALTURA DE QUIEN PASEA MIRA LA PRUEBA DE LO QUE TAPA: el pecho, entre los hombros y el
+ * cuello. Es lo que hay que ver para saber dónde está y hacia dónde va; los pies se pueden perder
+ * detrás de un banco sin que se pierda nada.
+ */
+export const LO_QUE_HAY_QUE_VER = ALTURA_DE_UNA_PERSONA * 0.7;
+
+/** Cada cuánto se prueba la cámara a lo largo de su carril, en unidades del mundo. */
+export const PASO_DEL_CARRIL = 0.25;
+
+/**
+ * HASTA DÓNDE PUEDE IRSE LA CÁMARA DE HOMBRO SIN QUE EL ADORNO SE PONGA DELANTE, en unidades.
+ *
+ * `hastaDondeCabeElHombro` pregunta a la arena, y la arena sólo sabe de estructura (ver la
+ * cabecera de `estorbos.ts`, con la señal de tráfico del Burgo). Esto hace la otra mitad con lo que
+ * el juego declara que estorba a la vista: la cámara va por su carril —detrás, a la altura de
+ * siempre— y se prueba de `PASO_DEL_CARRIL` en `PASO_DEL_CARRIL`, de cerca a lejos, si la línea
+ * que va de ella al pecho de quien pasea (`LO_QUE_HAY_QUE_VER`) cruza alguna caja. Se devuelve el
+ * último sitio bueno antes del primero tapado, y `lejos` si no se tapa ninguno. `suelo` es donde se
+ * apoya la cámara y `pies` donde se pintan los pies, que en Las Lindes no son lo mismo.
+ *
+ * De cerca a lejos, y parando en el primero tapado, a propósito: detrás de una farola vuelve a haber
+ * sitio, y saltar al otro lado de ella dejaría la farola entre la cámara y la nuca, que es justo lo
+ * que no hay que hacer. Lo que sale entra en `acercarElHombro` igual que lo de la arena —el menor de
+ * los dos—, así que la cámara se acerca deprisa y se aleja despacio, sin saltos.
+ */
+export function hastaDondeNoTapa(
+  estorbos: EstorbosDelPaseo,
+  quien: QuienSeMira,
+  suelo = 0,
+  lejos = ATRAS_DEL_HOMBRO,
+  pies = suelo,
+): number {
+  if (!(lejos > 0)) return 0;
+  if (estorbos.ancho === 0 || estorbos.fondo === 0) return lejos;
+  const pecho = { x: quien.x, y: pies + LO_QUE_HAY_QUE_VER, z: quien.z };
+  const trozos = Math.ceil(lejos / PASO_DEL_CARRIL);
+  let libre = 0;
+  for (let i = 1; i <= trozos; i++) {
+    const d = Math.min(lejos, i * PASO_DEL_CARRIL);
+    const c = camaraDeHombro(quien, suelo, d);
+    if (tapaLaVista(estorbos, pecho, { x: c.x, y: c.y, z: c.z })) return libre;
     libre = d;
   }
   return libre;

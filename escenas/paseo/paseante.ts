@@ -74,6 +74,29 @@
  * ninguno a un paso. Se busca el sitio libre más cercano en anillos, con la tabla de rumbos y
  * aritmética entera, y ahí se nace. Es un rescate y no el sitio de nacer: dónde se nace lo
  * declara el mundo (`MundoDeclarado.nace`), y quien monta el paseo avisa si ha hecho falta.
+ *
+ * Y NO SÓLO AL NACER: cada tic mira antes de dar el paso si se puede estar donde se está, y si no,
+ * lo da desde el sitio libre más cercano (`ticDelPaseo`). Nacer y mudar de mundo ya rescataban,
+ * pero quien acababa dentro de algo por otra puerta —una corrección de la red, un estado de otro
+ * mundo, un mundo que llega tarde— se quedaba CLAVADO: ni adelante ni atrás. Es lo que se vio el
+ * 27-sep-2026 en el Burgo, junto a las torres del centro; `verify:paseo` lo reproduce con el paso
+ * de `shared/` a secas.
+ *
+ * ═══ Y UN PASO NO SALTA RENDIJAS ═══
+ *
+ * `unPaso` mira sólo el sitio de LLEGADA. Donde dos cajas se tocan por las esquinas con un hueco
+ * más estrecho que quien anda, las dos orillas son buenas y en medio no se cabe: un paso en
+ * diagonal —0,6 andando, 1,32 corriendo— salta de una a otra. Pasa en el Burgo en las rendijas de
+ * 0,6 entre las torres del centro (en la mesa ABCD, 988 de los 54.669 pasos que se mueven desde
+ * una rejilla alrededor de dos de ellas) y en Las Lindes entre casas. El servidor, que valida el
+ * tramo en recta o en escuadra, lo rechaza y devuelve a quien lo dio; con la tecla pulsada el
+ * aparato lo vuelve a dar, y se ve como un tirón atrás contra una pared que no está.
+ *
+ * Así que el paseo da el paso de `shared/` y mira su TRAMO con una cuenta exacta y entera
+ * (`cruzaUnCuerpo`); si cruza un cuerpo, lo rehace eje a eje como resbala `unPaso`, con el tramo de
+ * cada eje mirado igual (`pasoSinCruzar`). Casi siempre no cruza nada, y el paso es exactamente el de
+ * `shared/`: el paso de `shared/` no se toca, porque es lo que miden los dos motores y lo que el
+ * servidor no resimula.
  */
 import {
   COSENO,
@@ -241,16 +264,133 @@ export function mudarDeMundo(arena: Arena, e: EstadoDelPaseo, radio: number = RA
 
 /* ─── Los tics ───────────────────────────────────────────────────────────── */
 
-/** UN TIC: el paso de `shared/`, y lo que se anduvo de verdad. */
+/**
+ * ¿CRUZA EL TRAMO DE `a` A `b` ALGÚN CUERPO, ENSANCHADO POR EL RADIO? Todo en Q16.16, y exacto.
+ *
+ * Quien anda choca con una caja cuando su centro cae DENTRO de la caja ensanchada un radio por cada
+ * lado, con los bordes abiertos (`chocaConCuerpo`, en `mundo.ts`). El tramo `a + t·(b − a)` con `t`
+ * de 0 a 1 la cruza si hay un `t` que cae dentro de los dos intervalos abiertos, el de `x` y el de
+ * `z`, a la vez. Cada intervalo es una fracción de enteros, y se comparan multiplicando en cruz: con
+ * coordenadas de hasta 2²⁶ y un paso de menos de 2¹⁸ los productos no pasan de 2⁴⁴, exactos en un
+ * doble y los mismos en V8 y en Hermes. Nada de muestrear: una rendija entre dos esquinas puede ser
+ * más fina que cualquier trozo.
+ *
+ * Todas las cajas, sin índice: sólo se pregunta cuando el paso se ha movido, una vez por tic, y
+ * descartar una caja por su rectángulo son cuatro comparaciones. Las 1.975 de un tablero lleno de
+ * Las Lindes por veinte tics son 40.000 comparaciones por segundo.
+ */
+export function cruzaUnCuerpo(arena: Arena, a: Andante, b: Andante, radio: number = RADIO_DEL_PASEANTE): boolean {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  if (dx === 0 && dz === 0) return false;
+  const menorX = dx < 0 ? b.x : a.x;
+  const mayorX = dx < 0 ? a.x : b.x;
+  const menorZ = dz < 0 ? b.z : a.z;
+  const mayorZ = dz < 0 ? a.z : b.z;
+  const c = arena.cuerpos;
+  for (let i = 0; i < c.length; i += 4) {
+    const x0 = (c[i] as number) - radio;
+    const z0 = (c[i + 1] as number) - radio;
+    const x1 = (c[i + 2] as number) + radio;
+    const z1 = (c[i + 3] as number) + radio;
+    /* Si la caja no pisa el rectángulo del tramo, no lo toca (y con un eje de ancho cero, también vale). */
+    if (x1 <= menorX || x0 >= mayorX || z1 <= menorZ || z0 >= mayorZ) continue;
+    /* El intervalo de `t` donde se está dentro: `desde/deDesde < t < hasta/deHasta`, empezando por [0, 1]. */
+    let desde = 0;
+    let deDesde = 1;
+    let hasta = 1;
+    let deHasta = 1;
+    let vacio = false;
+    for (const [o, d, lo, hi] of [
+      [a.x, dx, x0, x1],
+      [a.z, dz, z0, z1],
+    ] as const) {
+      if (d === 0) {
+        if (!(o > lo && o < hi)) vacio = true;
+        continue;
+      }
+      /* Con el denominador positivo: `(lo − o)/d < t < (hi − o)/d` si `d > 0`, y al revés si no. */
+      const den = d > 0 ? d : -d;
+      const nDesde = d > 0 ? lo - o : o - hi;
+      const nHasta = d > 0 ? hi - o : o - lo;
+      if (nDesde * deDesde > desde * den) {
+        desde = nDesde;
+        deDesde = den;
+      }
+      if (nHasta * deHasta < hasta * den) {
+        hasta = nHasta;
+        deHasta = den;
+      }
+    }
+    if (vacio) continue;
+    if (desde * deHasta < hasta * deDesde) return true;
+  }
+  return false;
+}
+
+/**
+ * EL PASO DE UN TIC, SIN CRUZAR POR DONDE NO SE CABE.
+ *
+ * Es `pasoDelTic` de `shared/`, y casi siempre sale lo mismo: sólo si su tramo cruza un cuerpo
+ * (`cruzaUnCuerpo`) se mira si se llega doblando la esquina —un eje y luego el otro—, y si tampoco,
+ * se rehace eje a eje, como resbala `unPaso`, pero pidiendo a cada eje que su tramo tampoco cruce
+ * nada. Ver «Y UN PASO NO SALTA RENDIJAS» en la cabecera.
+ *
+ * El paso de `shared/` o es la diagonal entera o se ha movido por un solo eje: resbalando, el
+ * segundo eje prueba justo el sitio de la diagonal, que ya estaba ocupado. Así que si se movió
+ * por los dos ejes, fue en diagonal.
+ */
+export function pasoSinCruzar(
+  arena: Arena,
+  quien: Andante,
+  rumbo: number,
+  marcha: PedidoDelTic['marcha'],
+  radio: number = RADIO_DEL_PASEANTE,
+): Andante {
+  const paso = pasoDelTic(arena, quien, rumbo, marcha, radio);
+  const dx = paso.x - quien.x;
+  const dz = paso.z - quien.z;
+  if (dx === 0 && dz === 0) return paso;
+  if (!cruzaUnCuerpo(arena, quien, paso, radio)) return paso;
+  /* Por un solo eje y cruzando: un cuerpo más fino que el paso. Ahí no se anda. */
+  if (dx === 0 || dz === 0) return quien;
+  /*
+   * En diagonal y cruzando. Si se llega igual doblando la esquina —primero un eje y luego el otro,
+   * en cualquiera de los dos órdenes, sin cruzar nada—, el paso vale entero: es la ESCUADRA que el
+   * servidor también acepta, y así lo que rodea una esquina por fuera sale igual que en `shared/`.
+   */
+  const cabeSinCruzar = (de: Andante, a: Andante): boolean => sePuedeEstar(arena, a.x, a.z, radio) && !cruzaUnCuerpo(arena, de, a, radio);
+  const soloX = { x: quien.x + dx, z: quien.z };
+  const soloZ = { x: quien.x, z: quien.z + dz };
+  const porX = cabeSinCruzar(quien, soloX);
+  if (porX && !cruzaUnCuerpo(arena, soloX, paso, radio)) return paso;
+  if (cabeSinCruzar(quien, soloZ) && !cruzaUnCuerpo(arena, soloZ, paso, radio)) return paso;
+  /* Y si no, se resbala como en `unPaso`: primero `x`, luego `z`, cada eje con su tramo mirado. */
+  const x = porX ? soloX.x : quien.x;
+  const luegoZ = { x, z: quien.z + dz };
+  return cabeSinCruzar({ x, z: quien.z }, luegoZ) ? luegoZ : { x, z: quien.z };
+}
+
+/**
+ * UN TIC: el paso de `shared/` sin cruzar rendijas (`pasoSinCruzar`), y lo que se anduvo de verdad.
+ *
+ * Y ANTES, SI SE ESTÁ DENTRO DE ALGO, SE SALE: desde dentro de una caja `unPaso` no deja dar ni un
+ * paso, y quien acababa ahí —por la red, por un mundo que cambió o que llegó tarde— se quedaba
+ * clavado. El tic empieza entonces desde el sitio libre más cercano (`sitioDondeCabe`), y el
+ * rescate se pinta ya hecho: `antes` es el sitio libre, para no deslizar a nadie por dentro de un
+ * muro. Ver «Y NADIE SE QUEDA ENCERRADO» en la cabecera.
+ */
 export function ticDelPaseo(
   arena: Arena,
   e: EstadoDelPaseo,
   pedido: PedidoDelTic,
   radio: number = RADIO_DEL_PASEANTE,
 ): EstadoDelPaseo {
-  const ahora = pasoDelTic(arena, e.ahora, pedido.rumbo, pedido.marcha, radio);
-  const andado = e.andado + Math.hypot(aNumero(ahora.x - e.ahora.x), aNumero(ahora.z - e.ahora.z));
-  return { ...e, tic: e.tic + 1, antes: e.ahora, ahora, pedido, andado };
+  let desde = e.ahora;
+  if (!sePuedeEstar(arena, desde.x, desde.z, radio)) desde = sitioDondeCabe(arena, desde.x, desde.z, radio) ?? desde;
+  const ahora = pasoSinCruzar(arena, desde, pedido.rumbo, pedido.marcha, radio);
+  const andado = e.andado + Math.hypot(aNumero(ahora.x - desde.x), aNumero(ahora.z - desde.z));
+  return { ...e, tic: e.tic + 1, antes: desde, ahora, pedido, andado };
 }
 
 /**

@@ -21,7 +21,12 @@
  *     la velocidad del suelo.
  *  6. LA COSTURA CON LA RED. Un aviso por tic con lo pedido, que basta para rehacer el camino;
  *     y una corrección que no se pinta como un salto a la carrera.
- *  7. NACER. Nadie se queda encerrado dentro de una caja.
+ *  7. NACER. Nadie se queda encerrado dentro de una caja; y si acaba dentro de algo por otra puerta,
+ *     el primer tic lo saca (no se queda clavado, como se vio en el Burgo el 27-sep-2026).
+ *  7b. UN PASO NO SALTA RENDIJAS: entre dos esquinas más juntas que quien anda no se pasa, ni en una
+ *     prueba ni junto a las torres del centro del Burgo de verdad.
+ *  7c. LA CÁMARA NO SE QUEDA DETRÁS DEL ADORNO: una señal o un semáforo declarados la acercan, por
+ *     debajo del brazo de un semáforo no, y en el Burgo ABCD con su adorno ninguno se le pone delante.
  *  8. EL GOLPE Y EL SUELO. La G golpea y no se come la de un campo de texto; un toque es un golpe,
  *     en el primer tic que se dé y en uno solo; y en el suelo no se da ni un tic.
  *  9. EL MONTAJE. Que la escena y la app usan esto y no otra cosa: se mira en el fuente, que es
@@ -34,6 +39,7 @@ import fs from 'node:fs';
 import {
   ANDANDO,
   CORRIENDO,
+  pasoDelTic,
   QUIETO,
   RADIO_DEL_PASEANTE,
   RUMBOS,
@@ -42,9 +48,16 @@ import {
   VELOCIDAD_ANDANDO,
   VELOCIDAD_CORRIENDO,
 } from '../../shared/mecanicas/andar';
+import type { Marcha } from '../../shared/mecanicas/andar';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
-import { arenaDe, sePuedeEstar } from '../../shared/mecanicas/mundo';
+import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, Casilla, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
+import { mundoDelBurgo } from '../../shared/arcade/juegos/burgo-mundo';
+import { acercarElHombro, camaraDeHombro, hastaDondeCabeElHombro, hastaDondeNoTapa, LO_QUE_HAY_QUE_VER } from '../paseo/camaras';
+import { estorbosDePiezas, indiceDeEstorbos, rodajasDeUnaMalla, SIN_ESTORBOS, tapaLaVista } from '../paseo/estorbos';
+import type { Estorbo } from '../paseo/estorbos';
+import { ciudadDelCodigo } from '../burgo/ciudad';
+import { estorbosDelBurgo } from '../burgo/estorbos-del-burgo';
 import { CLIP } from '../embarcadero/figuras';
 import {
   COMO_SE_GOLPEA,
@@ -118,6 +131,9 @@ const MURALLA: Cuerpo = { x0: -30, z0: -12, x1: 30, z1: -10 };
 
 const ABIERTO = arenaDe(mundoDePrueba([]));
 const CON_MURALLA = arenaDe(mundoDePrueba([MURALLA]));
+
+/** Andando y corriendo, con su tipo: una lista suelta de las dos sale `number[]`. */
+const LAS_DOS_MARCHAS: readonly Marcha[] = [ANDANDO, CORRIENDO];
 
 const ADELANTE: Teclas = { ...SIN_TECLAS, adelante: true };
 const ATRAS: Teclas = { ...SIN_TECLAS, atras: true };
@@ -708,16 +724,355 @@ paso('Nadie se queda encerrado: si donde se nace no se cabe, se nace en el sitio
   comprobar('y si se cabe, sigue siendo el mismo estado, sin tocarlo', mudarDeMundo(CON_MURALLA, tranquilo) === tranquilo);
 
   /*
-   * LA VACUNA: quien está dentro de una caja no sale andando. `unPaso` sólo acepta sitios donde
-   * se cabe, y desde dentro no hay ninguno a un paso: por eso hace falta el rescate.
+   * ═══ Y SI YA ESTÁ DENTRO, EL PASEO LO SACA: NO SE QUEDA CLAVADO ═══
+   *
+   * Nacer y mudar de mundo rescatan, pero hay más puertas por las que se acaba dentro de algo: una
+   * corrección de la red que llega con un mundo que ha cambiado, un mundo que se deriva tarde, un
+   * estado que se guardó con otro mundo. Desde dentro de una caja `unPaso` no deja salir —sólo
+   * acepta sitios donde se cabe, y a un paso no hay ninguno—, así que quien acababa ahí se quedaba
+   * CLAVADO: ni adelante ni atrás, que es lo que se vio el 27-sep-2026 en el Burgo. Ahora cada tic
+   * mira antes si se puede estar donde se está, y si no, empieza desde el sitio libre más cercano.
+   *
+   * LA VACUNA es el paso de `shared/` a secas, que es lo que daba el paseo antes: desde dentro de la
+   * muralla, ni un paso en ningún rumbo. La red de verdad —el servidor— valida con la estructura, que
+   * es la misma arena, así que un sitio dentro de un cuerpo tampoco se lo acepta nunca.
    */
   const encerrado: EstadoDelPaseo = { ...enElMuro, antes: { x: 0, z: deNumero(-11) }, ahora: { x: 0, z: deNumero(-11) } };
-  const intenta = andar(CON_MURALLA, encerrado, conTeclas(ATRAS), 60).estado;
+  let rumbosQueSalen = 0;
+  for (let r = 0; r < RUMBOS; r += 4) {
+    for (const m of LAS_DOS_MARCHAS) {
+      const s = pasoDelTic(CON_MURALLA, encerrado.ahora, r, m);
+      if (s.x !== encerrado.ahora.x || s.z !== encerrado.ahora.z) rumbosQueSalen++;
+    }
+  }
+  comprobar('la vacuna: con el paso de `shared/` a secas, desde dentro de la muralla no se da un paso en ningún rumbo', rumbosQueSalen === 0, {
+    rumbosQueSalen,
+  });
+  /* Mirando al norte: sale por el lado del muro que tenga más cerca, y desde ahí se aleja andando hacia ese lado. */
+  let seAleja = 0;
+  for (const [nombre, teclas] of [
+    ['hacia atrás', ATRAS],
+    ['hacia delante', ADELANTE],
+  ] as const) {
+    const intenta = andar(CON_MURALLA, encerrado, conTeclas(teclas), 60);
+    const primero = intenta.sitios[0];
+    comprobar(
+      `y el paseo, desde dentro de la muralla y pulsando ${nombre}, sale en el primer tic y ningún tic vuelve a meterse`,
+      primero !== undefined &&
+        sePuedeEstar(CON_MURALLA, primero.x, primero.z, RADIO_DEL_PASEANTE) &&
+        intenta.sitios.every((s) => sePuedeEstar(CON_MURALLA, s.x, s.z, RADIO_DEL_PASEANTE)),
+      { primero, ultimo: intenta.estado.ahora },
+    );
+    if (Math.abs(aNumero(intenta.estado.ahora.z) + 11) > 3) seAleja++;
+  }
+  comprobar('y hacia el lado por el que salió se aleja de la muralla: ya no está clavado', seAleja === 1, { seAleja });
+  const quieto = ticDelPaseo(CON_MURALLA, encerrado, { rumbo: 0, marcha: QUIETO });
   comprobar(
-    'y sin el rescate, quien nace dentro de la muralla no da un paso en sesenta fotogramas',
-    intenta.ahora.x === 0 && intenta.ahora.z === deNumero(-11),
-    intenta.ahora,
+    'y aunque no se pulse nada: el tic lo saca y lo pinta ya fuera, sin deslizarlo por dentro del muro',
+    sePuedeEstar(CON_MURALLA, quieto.ahora.x, quieto.ahora.z, RADIO_DEL_PASEANTE) && quieto.antes === quieto.ahora,
+    quieto.ahora,
   );
+}
+
+// ---------------------------------------------------------------------------
+paso('Un paso no cruza por donde no se cabe: ni entre dos esquinas, ni en el Burgo de verdad');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * `unPaso` mira sólo el sitio de LLEGADA. Entre dos cajas que se tocan por las esquinas con un
+ * hueco más estrecho que quien anda, las dos orillas son sitios buenos y en medio no se cabe; un
+ * paso en diagonal de 0,6 —o de 1,32 corriendo— salta de una a otra sin pasar por ningún sitio
+ * donde se quepa. El servidor lo rechaza (su recta y su escuadra muerden las dos esquinas) y
+ * devuelve atrás; el aparato, con la tecla pulsada, lo vuelve a dar. En el Burgo pasa en las
+ * rendijas de 0,6 entre las torres del centro, junto a la glorieta: medido con `pasoDelTic` al azar,
+ * 3 pasos así de cada 160.000 en la mesa ABCD, y otros tantos en Las Lindes entre sus casas.
+ *
+ * El paseo da ahora el paso de `shared/` y, si su tramo cruza un cuerpo ensanchado por el radio
+ * —con una cuenta exacta y entera, sin muestrear: una rendija puede ser más fina que cualquier
+ * muestreo—, lo rehace eje a eje con el tramo de cada eje mirado. Casi siempre no cruza nada y el
+ * paso es EL MISMO de `shared/`.
+ */
+{
+  /* Dos cajas que se tocan por las esquinas: un hueco de 0,6 por eje, y quien anda mide 0,8. */
+  const ESQUINAS = arenaDe(
+    mundoDePrueba([
+      { x0: -20, z0: -20, x1: -0.3, z1: -0.3 },
+      { x0: 0.3, z0: 0.3, x1: 20, z1: 20 },
+    ]),
+  );
+  const alOtroLado = (s: Andante): boolean => aNumero(s.x) > 0 && aNumero(s.z) < 0;
+  let cruzanAntes = 0;
+  let cruzanAhora = 0;
+  let pruebas = 0;
+  for (let k = 0; k < 24; k++) {
+    for (const m of LAS_DOS_MARCHAS) {
+      /* Desde el suroeste de la rendija, hacia el noreste (rumbo 32 de 256: 45°), corriendo y andando. */
+      const desde: Andante = { x: deNumero(-3 - k * 0.025), z: deNumero(3 + k * 0.025) };
+      let viejo = desde;
+      let e: EstadoDelPaseo = nacerEnElPaseo(ESQUINAS, { x: aNumero(desde.x), z: aNumero(desde.z), rumbo: Math.PI / 4 });
+      for (let t = 0; t < 40; t++) {
+        viejo = pasoDelTic(ESQUINAS, viejo, 32, m);
+        e = ticDelPaseo(ESQUINAS, e, { rumbo: 32, marcha: m });
+      }
+      pruebas++;
+      if (alOtroLado(viejo)) cruzanAntes++;
+      if (alOtroLado(e.ahora)) cruzanAhora++;
+    }
+  }
+  console.log(`  entre dos esquinas a 0,6: el paso de shared/ cruza en ${String(cruzanAntes)} de ${String(pruebas)}, el del paseo en ${String(cruzanAhora)}`);
+  comprobar('la vacuna: con el paso de `shared/` a secas, se cruza la rendija de 0,6 entre dos esquinas', cruzanAntes > 0, { cruzanAntes });
+  comprobar('y con el paso del paseo, en ninguna de las pruebas', cruzanAhora === 0, { cruzanAhora, pruebas });
+
+  /* Y sin rendija —las mismas cajas separadas 1,2—, sí se pasa: lo que para es el hueco, no la diagonal. */
+  const ANCHO = arenaDe(
+    mundoDePrueba([
+      { x0: -20, z0: -20, x1: -0.6, z1: -0.6 },
+      { x0: 0.6, z0: 0.6, x1: 20, z1: 20 },
+    ]),
+  );
+  let e: EstadoDelPaseo = nacerEnElPaseo(ANCHO, { x: -3, z: 3, rumbo: Math.PI / 4 });
+  for (let t = 0; t < 40; t++) e = ticDelPaseo(ANCHO, e, { rumbo: 32, marcha: ANDANDO });
+  comprobar('y con un hueco de 1,2, donde se cabe, el paseo pasa al otro lado', alOtroLado(e.ahora), e.ahora);
+
+  /*
+   * EN EL BURGO DE VERDAD, en las rendijas de 0,6 entre las torres del centro de la mesa ABCD: desde
+   * cada punto de una rejilla alrededor de las dos esquinas, en 128 rumbos, andando y corriendo. Se
+   * juzga con lo que juzga el servidor: que el tramo se ande en recta o en escuadra
+   * (`seAndaEnRecta`, en `mundo.ts`), y que se llegue a un sitio donde se pueda estar.
+   */
+  const burgo = arenaDe(mundoDelBurgo('ABCD'));
+  const seAnda = (a: Andante, b: Andante): boolean => {
+    if (seAndaEnRecta(burgo, a, b, RADIO_DEL_PASEANTE)) return true;
+    const x = { x: b.x, z: a.z };
+    const z = { x: a.x, z: b.z };
+    return (
+      (seAndaEnRecta(burgo, a, x, RADIO_DEL_PASEANTE) && seAndaEnRecta(burgo, x, b, RADIO_DEL_PASEANTE)) ||
+      (seAndaEnRecta(burgo, a, z, RADIO_DEL_PASEANTE) && seAndaEnRecta(burgo, z, b, RADIO_DEL_PASEANTE))
+    );
+  };
+  let malosAntes = 0;
+  let malosAhora = 0;
+  let dentroAhora = 0;
+  let movidos = 0;
+  let distintos = 0;
+  for (const [cx, cz] of [
+    [-48.3, -48.3],
+    [-48.3, -24.3],
+  ] as const) {
+    for (let i = -10; i <= 10; i++) {
+      for (let j = -10; j <= 10; j++) {
+        const q: Andante = { x: deNumero(cx + i * 0.1), z: deNumero(cz + j * 0.1) };
+        if (!sePuedeEstar(burgo, q.x, q.z, RADIO_DEL_PASEANTE)) continue;
+        const e0: EstadoDelPaseo = { ...nacerEnElPaseo(burgo, { x: aNumero(q.x), z: aNumero(q.z), rumbo: 0 }), antes: q, ahora: q };
+        for (let r = 0; r < RUMBOS; r += 2) {
+          for (const m of LAS_DOS_MARCHAS) {
+            const viejo = pasoDelTic(burgo, q, r, m);
+            const viejoMalo = (viejo.x !== q.x || viejo.z !== q.z) && !seAnda(q, viejo);
+            if (viejoMalo) malosAntes++;
+            const nuevo = ticDelPaseo(burgo, e0, { rumbo: r, marcha: m }).ahora;
+            if (nuevo.x !== q.x || nuevo.z !== q.z) movidos++;
+            /* Los que cambian sin que el de `shared/` fuera malo: la recta del servidor muestrea, la cuenta del paseo es exacta. */
+            if (!viejoMalo && (nuevo.x !== viejo.x || nuevo.z !== viejo.z)) distintos++;
+            if ((nuevo.x !== q.x || nuevo.z !== q.z) && !seAnda(q, nuevo)) malosAhora++;
+            if (!sePuedeEstar(burgo, nuevo.x, nuevo.z, RADIO_DEL_PASEANTE)) dentroAhora++;
+          }
+        }
+      }
+    }
+  }
+  console.log(
+    `  en el Burgo ABCD, junto a las rendijas del centro: ${String(malosAntes)} pasos de shared/ que el servidor no aceptaría; del paseo, ${String(malosAhora)} de ${String(movidos)} que se mueven, y ${String(distintos)} buenos que cambian`,
+  );
+  comprobar('la vacuna: en el Burgo ABCD, el paso de `shared/` a secas cruza alguna rendija entre torres', malosAntes > 0, { malosAntes });
+  comprobar(
+    'y el del paseo no da ninguno que el servidor no aceptase, ni acaba nunca dentro de un cuerpo',
+    malosAhora === 0 && dentroAhora === 0 && movidos > 10_000,
+    { malosAhora, dentroAhora, movidos },
+  );
+  /*
+   * Y LOS BUENOS SE QUEDAN COMO ESTABAN: un paso de `shared/` que el servidor acepta sale igual del
+   * paseo, salvo los poquísimos que rozan una esquina por dentro de lo que la recta del servidor
+   * muestrea (a trozos de un radio) y que la cuenta exacta ve cruzar.
+   */
+  comprobar('y casi siempre es el mismo paso de `shared/`: de los que el servidor acepta, cambia menos de uno por mil', distintos < movidos / 1000, {
+    distintos,
+    malosAntes,
+    movidos,
+  });
+}
+
+// ---------------------------------------------------------------------------
+paso('La cámara de hombro no se queda detrás del adorno: ni de una señal, ni de un semáforo');
+// ---------------------------------------------------------------------------
+
+/*
+ * ═══ LO QUE ESTO CIERRA ═══
+ *
+ * El 27-sep-2026, andando por una calle del Burgo, la cámara de hombro se quedó detrás de una
+ * señal de tráfico que tapaba media pantalla. `hastaDondeCabeElHombro` sólo pregunta a la arena, que
+ * es la estructura, y el mobiliario es adorno. Aquí se pone una señal de prueba detrás de quien
+ * pasea —un panel en alto, entre él y donde iría la cámara— y se mira desde dónde queda la vista.
+ */
+{
+  const quien = { x: 0, z: 0, rumbo: 0 };
+  const pecho = { x: 0, y: LO_QUE_HAY_QUE_VER, z: 0 };
+  /* El panel: dos de ancho, de 2,5 a 4,5 de alto, a cuatro por detrás (al sur: la cámara mira al norte). */
+  const SENAL: Estorbo = { x0: -1, y0: 2.5, z0: 3.95, x1: 1, y1: 4.5, z1: 4.05 };
+  const conSenal = indiceDeEstorbos([SENAL]);
+  const soloArena = hastaDondeCabeElHombro(ABIERTO, quien);
+  const antes = camaraDeHombro(quien, 0, acercarElHombro(null, soloArena, 1 / 60));
+  console.log(`  con la arena sola la cámara se queda a ${soloArena.toFixed(2)} por detrás; la señal está a 3,95`);
+  comprobar(
+    'la vacuna: con la arena sola, la cámara se queda detrás de la señal, que le tapa a quien pasea',
+    tapaLaVista(conSenal, pecho, { x: antes.x, y: antes.y, z: antes.z }),
+    { soloArena },
+  );
+  const noTapa = hastaDondeNoTapa(conSenal, quien, 0, soloArena);
+  let atras: number | null = null;
+  let peor = 0;
+  for (let f = 0; f < 60; f++) {
+    atras = acercarElHombro(atras, Math.min(soloArena, hastaDondeNoTapa(conSenal, quien, 0, soloArena)), 1 / 60);
+    const c = camaraDeHombro(quien, 0, atras);
+    if (f > 6 && tapaLaVista(conSenal, pecho, { x: c.x, y: c.y, z: c.z })) peor++;
+  }
+  console.log(`  con la señal declarada: hasta ${noTapa.toFixed(2)} no tapa, y la cámara acaba a ${(atras ?? 0).toFixed(2)}`);
+  comprobar(
+    'y declarándola, la cámara se pone delante de la señal: a partir del primer fotograma a pie no la tiene delante nunca',
+    noTapa < 3.95 && noTapa >= 3 && peor === 0 && atras !== null && atras < 3.95,
+    { noTapa, atras, peor },
+  );
+
+  /*
+   * Y POR DEBAJO DEL BRAZO DE UN SEMÁFORO NO SE ACERCA. La pieza se corta en rodajas: el poste
+   * fino, el brazo arriba. Una caja entera —poste, brazo y el aire de debajo— se echaría la cámara
+   * a la nuca cada vez que se pasa por debajo; las rodajas, no.
+   */
+  const caja = (x0: number, y0: number, z0: number, x1: number, y1: number, z1: number): number[] => {
+    /* Doce triángulos de una caja, sin índice. */
+    const v = [
+      [x0, y0, z0],
+      [x1, y0, z0],
+      [x1, y1, z0],
+      [x0, y1, z0],
+      [x0, y0, z1],
+      [x1, y0, z1],
+      [x1, y1, z1],
+      [x0, y1, z1],
+    ] as const;
+    const caras = [
+      [0, 1, 2, 0, 2, 3],
+      [4, 6, 5, 4, 7, 6],
+      [0, 4, 5, 0, 5, 1],
+      [3, 2, 6, 3, 6, 7],
+      [0, 3, 7, 0, 7, 4],
+      [1, 5, 6, 1, 6, 2],
+    ];
+    const salida: number[] = [];
+    for (const c of caras) for (const k of c) salida.push(...(v[k] as readonly number[]));
+    return salida;
+  };
+  /* Un semáforo de brazo en sus ejes: poste de 0,3 hasta 6, y un brazo de ocho hacia +x entre 5,4 y 6. */
+  const semaforo = [...caja(-0.15, 0, -0.15, 0.15, 6, 0.15), ...caja(0, 5.4, -0.2, 8, 6, 0.2)];
+  const rodajas = rodajasDeUnaMalla(semaforo, null);
+  const anchas = rodajas.filter((r) => r.x1 - r.x0 > 1);
+  comprobar(
+    'las rodajas de un semáforo de brazo: el poste fino abajo, el brazo ancho sólo arriba',
+    rodajas.length >= 2 && anchas.length >= 1 && anchas.every((r) => r.y0 >= 4.5) && rodajas.every((r) => r.y1 - r.y0 > 0),
+    rodajas,
+  );
+  /* Puesto en el mundo con el brazo cruzando por encima de donde está quien pasea, de este a oeste. */
+  const puesto = estorbosDePiezas([{ pieza: 'semaforo', x: -4, y: 0, z: 2, giro: 0, talla: 1 }], (p) => (p === 'semaforo' ? rodajas : null));
+  const porDebajo = hastaDondeNoTapa(indiceDeEstorbos(puesto), quien, 0, soloArena);
+  const deUnaPieza = indiceDeEstorbos(
+    estorbosDePiezas([{ pieza: 'semaforo', x: -4, y: 0, z: 2, giro: 0, talla: 1 }], () => [{ x0: -0.15, y0: 0, z0: -0.2, x1: 8, y1: 6, z1: 0.2 }]),
+  );
+  comprobar(
+    'y pasando por debajo del brazo, la cámara no se acerca; con una sola caja por pieza, sí se echaría encima',
+    porDebajo === soloArena && hastaDondeNoTapa(deUnaPieza, quien, 0, soloArena) < 2.5,
+    { porDebajo, soloArena },
+  );
+  /* Girado un cuarto (brazo hacia −z), la caja girada va donde va la pieza. */
+  const girado = estorbosDePiezas([{ pieza: 'semaforo', x: 0, y: 0, z: 0, giro: Math.PI / 2, talla: 1 }], () => [
+    { x0: 0, y0: 0, z0: -0.2, x1: 8, y1: 1, z1: 0.2 },
+  ]);
+  const g = girado[0];
+  comprobar(
+    'y una pieza girada un cuarto lleva su caja girada como la gira `rotation.y`: +x pasa a −z',
+    g !== undefined && Math.abs(g.z0 + 8) < 1e-9 && Math.abs(g.z1) < 1e-9 && Math.abs(g.x0 + 0.2) < 1e-9 && Math.abs(g.x1 - 0.2) < 1e-9,
+    g,
+  );
+
+  /* Una copa que envuelve a quien pasea no se mete entre él y la cámara: la tiene encima. */
+  const copa = indiceDeEstorbos([{ x0: -3, y0: 1, z0: -3, x1: 3, y1: 5, z1: 3 }]);
+  comprobar(
+    'y bajo la copa de un árbol que le envuelve el pecho, la cámara no se echa a la nuca por ella',
+    hastaDondeNoTapa(copa, quien, 0, soloArena) === soloArena,
+  );
+  comprobar('y sin estorbos declarados, lo que diga la arena', hastaDondeNoTapa(SIN_ESTORBOS, quien, 0, soloArena) === soloArena);
+
+  /* Y un índice con muchas cajas contesta lo mismo que mirarlas todas, en tramos al azar. */
+  const azar = sorteo(0x5e5a1);
+  const muchas: Estorbo[] = [];
+  for (let k = 0; k < 400; k++) {
+    const x = (azar() - 0.5) * 120;
+    const z = (azar() - 0.5) * 120;
+    const y = azar() * 6;
+    muchas.push({ x0: x, y0: y, z0: z, x1: x + 0.2 + azar() * 10, y1: y + 0.2 + azar() * 3, z1: z + 0.2 + azar() * 10 });
+  }
+  const indice = indiceDeEstorbos(muchas);
+  const unaAUna = muchas.map((c) => indiceDeEstorbos([c]));
+  let difieren = 0;
+  let tapados = 0;
+  for (let k = 0; k < 3000; k++) {
+    const a = { x: (azar() - 0.5) * 130, y: azar() * 5, z: (azar() - 0.5) * 130 };
+    const ang = azar() * Math.PI * 2;
+    const b = { x: a.x + Math.cos(ang) * 7, y: a.y + azar() * 3, z: a.z + Math.sin(ang) * 7 };
+    const aMano = unaAUna.some((i) => tapaLaVista(i, a, b));
+    const conIndice = tapaLaVista(indice, a, b);
+    if (conIndice) tapados++;
+    if (aMano !== conIndice) difieren++;
+  }
+  comprobar('y con cuatrocientas cajas indexadas, el índice contesta lo mismo que mirarlas una a una', difieren === 0 && tapados > 100, {
+    difieren,
+    tapados,
+  });
+
+  /*
+   * EN EL BURGO DE VERDAD: el adorno de la mesa ABCD, con una rodaja de prueba por pieza (sin WebGL
+   * no hay catálogo que medir; en la escena salen del `.glb`). Cada semáforo, cada farola y cada
+   * coche aparcado tiene su caja donde se pinta, y detrás de cada semáforo, mirando a su poste desde
+   * tres unidades, la cámara no se queda al otro lado de él.
+   */
+  const ciudad = ciudadDelCodigo('ABCD');
+  const POSTE: readonly Estorbo[] = [{ x0: -0.3, y0: 0, z0: -0.3, x1: 0.3, y1: 6, z1: 0.3 }];
+  const delBurgo = estorbosDelBurgo(ciudad, () => POSTE);
+  const semaforos = ciudad.mobiliario.filter((p) => p.pieza === 'semaforo-c');
+  const esperadas = ciudad.mobiliario.length + ciudad.coches.aparcados.length;
+  comprobar(
+    'el adorno del Burgo trae una caja por pieza de mobiliario y por coche aparcado, más sus bultos que se levantan',
+    semaforos.length > 50 && delBurgo.length >= esperadas && delBurgo.length < esperadas + ciudad.fachadas.length + 1,
+    { cajas: delBurgo.length, esperadas, semaforos: semaforos.length },
+  );
+  const indiceDelBurgo = indiceDeEstorbos(delBurgo);
+  const arenaDelBurgo = arenaDe(mundoDelBurgo('ABCD'));
+  let detras = 0;
+  let conArena = 0;
+  for (const s of semaforos) {
+    /* Quien pasea a tres del poste, de espaldas a él (el poste le queda al sur): la cámara iría a 6,6 por detrás. */
+    const suyo = { x: s.x, z: s.z - 3, rumbo: 0 };
+    const cabe = hastaDondeCabeElHombro(arenaDelBurgo, suyo);
+    const noTapa = hastaDondeNoTapa(indiceDelBurgo, suyo, s.y, cabe);
+    const c = camaraDeHombro(suyo, s.y, Math.min(cabe, noTapa));
+    const cSolo = camaraDeHombro(suyo, s.y, cabe);
+    const ver = { x: suyo.x, y: s.y + LO_QUE_HAY_QUE_VER, z: suyo.z };
+    if (tapaLaVista(indiceDelBurgo, ver, { x: cSolo.x, y: cSolo.y, z: cSolo.z })) conArena++;
+    if (tapaLaVista(indiceDelBurgo, ver, { x: c.x, y: c.y, z: c.z })) detras++;
+  }
+  console.log(`  de ${String(semaforos.length)} semáforos del Burgo ABCD, con tres de espaldas al poste: la arena sola deja la cámara detrás en ${String(conArena)}, con el adorno en ${String(detras)}`);
+  comprobar('la vacuna: en el Burgo ABCD, con la arena sola la cámara se queda detrás del poste del semáforo', conArena > semaforos.length / 2, { conArena });
+  comprobar('y con su adorno declarado, detrás de ninguno', detras === 0, { detras });
 }
 
 // ---------------------------------------------------------------------------
@@ -931,6 +1286,25 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
     /useFrame\(\(_, dt\) => \{[\s\S]*\}, -1\);/.test(gancho),
   );
   /*
+   * LA CÁMARA DE HOMBRO MIRA TAMBIÉN LO QUE ESTORBA, Y EL BURGO SE LO DA. Con el gancho de antes —sólo
+   * `hastaDondeCabeElHombro`— la cámara se quedaba detrás de la señal del Burgo; se ve caer quitando
+   * el mínimo de los dos, o quitándole al Burgo la prop.
+   */
+  const burgo = leer('./../burgo/Burgo.tsx');
+  const miraLoQueEstorba = (c: string): boolean =>
+    /const cabe = hastaDondeCabeElHombro\(arena, p\);\s*const noTapa = o\.estorbos === undefined \|\| o\.estorbos === null \? cabe : hastaDondeNoTapa\(o\.estorbos, p, suelo, cabe, y\);\s*atras = acercarElHombro\(atrasDelHombro\.current, Math\.min\(cabe, noTapa\), dt\);/.test(
+      c,
+    );
+  const elBurgoLoDa = (c: string): boolean =>
+    /indiceDeEstorbos\(estorbosDelBurgo\(ciudad, rodajasDelCatalogo\(catalogo\)\)\)/.test(c) &&
+    /usarElPaseo\(\{[^}]*\bestorbos: estorbosAPie,[^}]*\}\)/.test(c);
+  comprobar('la cámara de hombro se queda con lo menos de lo que cabe en la arena y de lo que no tapa el adorno', miraLoQueEstorba(gancho));
+  comprobar('y el Burgo le da su adorno, medido en el catálogo que pinta', elBurgoLoDa(burgo));
+  comprobar(
+    'y se ve caer: con la cámara de antes, sólo con la arena, o con un Burgo que no pasa su adorno',
+    !miraLoQueEstorba(gancho.replace('Math.min(cabe, noTapa)', 'cabe')) && !elBurgoLoDa(burgo.replace('estorbos: estorbosAPie,', '')),
+  );
+  /*
    * EL FOTOGRAMA DEL GANCHO ES EL MEDIDO ARRIBA: `fotogramaDeQuienPasea`, con las teclas, los mandos
    * de fuera, las dos cuentas de golpes, si está caído según el canal y la costura con la red. Se ve
    * caer quitándole el suelo —el gancho andaría tumbado— y quitándole la cuenta del teclado.
@@ -1022,5 +1396,6 @@ console.log(`${hechas} comprobaciones`);
 console.log('\nEl reloj cuenta tics enteros y no se desboca, se pinta entre los dos últimos, las teclas y la');
 console.log('palanca piden lo que tienen que pedir, la muralla para y deja resbalar, la marioneta se queda');
 console.log('quieta contra ella y corre al correr sin patinar, lo pedido basta para rehacer el camino, nadie');
-console.log('se queda encerrado, la G golpea sin comerse la de un campo y un toque es un golpe en un solo');
-console.log('tic, en el suelo no se anda, y la escena y la app montan justo esto.');
+console.log('se queda encerrado ni clavado, ningún paso salta una rendija, la cámara no se queda detrás del');
+console.log('adorno, la G golpea sin comerse la de un campo y un toque es un golpe en un solo tic, en el suelo');
+console.log('no se anda, y la escena y la app montan justo esto.');
