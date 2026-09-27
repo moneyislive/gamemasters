@@ -82,6 +82,12 @@
  * 27-sep-2026 en el Burgo, junto a las torres del centro; `verify:paseo` lo reproduce con el paso
  * de `shared/` a secas.
  *
+ * SALVO DEL ADORNO, DEL QUE SE SALE ANDANDO. Desde el 27-sep-2026 el adorno también choca en el
+ * aparato (`adorno-que-choca.ts`), y el servidor, que no lo ve, puede poner a alguien dentro de un
+ * coche o de un pino al entrar o al renacer. Ahí no se salta al sitio libre más cercano —el servidor
+ * ignoraría un primer paso tan largo y le devolvería dentro—: se sale un tic de correr por tic, en
+ * recta por la estructura (`salirDelAdorno`).
+ *
  * ═══ Y UN PASO NO SALTA RENDIJAS ═══
  *
  * `unPaso` mira sólo el sitio de LLEGADA. Donde dos cajas se tocan por las esquinas con un hueco
@@ -100,6 +106,7 @@
  */
 import {
   COSENO,
+  DT_DEL_TIC,
   pasoDelTic,
   QUIETO,
   RADIO_DEL_PASEANTE,
@@ -107,10 +114,12 @@ import {
   rumboDeRadianes,
   SENO,
   TICS_POR_SEGUNDO,
+  VELOCIDAD_CORRIENDO,
 } from '../../shared/mecanicas/andar';
-import { aNumero, deNumero, por } from '../../shared/mecanicas/fijo';
-import { sePuedeEstar } from '../../shared/mecanicas/mundo';
+import { aNumero, deNumero, por, UNO } from '../../shared/mecanicas/fijo';
+import { seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Andante, Arena, Sitio } from '../../shared/mecanicas/mundo';
+import { estructuraDe } from './adorno-que-choca';
 import { girar, golpesVistosTras, mandosDelFotograma, pedidoDelTic } from './mandos';
 import type { EntradaDelTic, Mandos, MandosDeFuera, PedidoDelTic, Teclas } from './mandos';
 
@@ -275,11 +284,52 @@ export function mudarDeMundo(arena: Arena, e: EstadoDelPaseo, radio: number = RA
  * doble y los mismos en V8 y en Hermes. Nada de muestrear: una rendija entre dos esquinas puede ser
  * más fina que cualquier trozo.
  *
- * Todas las cajas, sin índice: sólo se pregunta cuando el paso se ha movido, una vez por tic, y
- * descartar una caja por su rectángulo son cuatro comparaciones. Las 1.975 de un tablero lleno de
- * Las Lindes por veinte tics son 40.000 comparaciones por segundo.
+ * CON EL ÍNDICE DE LA ARENA. Iba sin él —las 1.975 cajas de un tablero lleno de Las Lindes por
+ * veinte tics eran 40.000 comparaciones por segundo—, pero con el adorno que choca
+ * (`adorno-que-choca.ts`) el Burgo pasa de mil y pico cuerpos a más de diez mil, y en el Hermes del
+ * móvil, sin JIT, recorrerlos todos en cada tic que se mueve ya se nota. Se miran los cajones que
+ * pisa el rectángulo del tramo ensanchado un radio —uno, o dos si cae en una raya: un tic no llega a
+ * dos unidades y un cajón mide treinta y dos—, con la misma cuenta con la que `mundo.ts` los monta
+ * (`CAJON_EN_FIJO`). Una caja apuntada en dos cajones se mira dos veces, que para contestar «¿cruza
+ * algo?» da igual. `verify:paseo` lo compara con el recorrido entero (`cruzaUnCuerpoSinIndice`) en
+ * tramos al azar sobre el Burgo con su adorno.
  */
 export function cruzaUnCuerpo(arena: Arena, a: Andante, b: Andante, radio: number = RADIO_DEL_PASEANTE): boolean {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  if (dx === 0 && dz === 0) return false;
+  if (arena.cajonesAncho === 0 || arena.cajonesFondo === 0) return false;
+  const menorX = dx < 0 ? b.x : a.x;
+  const mayorX = dx < 0 ? a.x : b.x;
+  const menorZ = dz < 0 ? b.z : a.z;
+  const mayorZ = dz < 0 ? a.z : b.z;
+  let desdeCx = Math.floor((menorX - radio) / CAJON_EN_FIJO) - arena.cajonDesdeX;
+  let hastaCx = Math.floor((mayorX + radio) / CAJON_EN_FIJO) - arena.cajonDesdeX;
+  let desdeCz = Math.floor((menorZ - radio) / CAJON_EN_FIJO) - arena.cajonDesdeZ;
+  let hastaCz = Math.floor((mayorZ + radio) / CAJON_EN_FIJO) - arena.cajonDesdeZ;
+  if (hastaCx < 0 || hastaCz < 0 || desdeCx >= arena.cajonesAncho || desdeCz >= arena.cajonesFondo) return false;
+  if (desdeCx < 0) desdeCx = 0;
+  if (desdeCz < 0) desdeCz = 0;
+  if (hastaCx >= arena.cajonesAncho) hastaCx = arena.cajonesAncho - 1;
+  if (hastaCz >= arena.cajonesFondo) hastaCz = arena.cajonesFondo - 1;
+  for (let cz = desdeCz; cz <= hastaCz; cz++) {
+    for (let cx = desdeCx; cx <= hastaCx; cx++) {
+      const cajon = arena.cajones[cz * arena.cajonesAncho + cx];
+      if (cajon === undefined) continue;
+      for (const k of cajon) if (cruzaLaCaja(arena.cuerpos, k * 4, a, dx, dz, menorX, mayorX, menorZ, mayorZ, radio)) return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * El lado de un cajón del índice de la arena, en Q16.16: el de `mundo.ts` (32 unidades), que no lo
+ * exporta. Si allí cambiara, `verify:paseo` lo vería: compara `cruzaUnCuerpo` con el recorrido entero.
+ */
+const CAJON_EN_FIJO = 32 * UNO;
+
+/** LO MISMO QUE `cruzaUnCuerpo`, RECORRIENDO TODAS LAS CAJAS: como era antes, para comparar. */
+export function cruzaUnCuerpoSinIndice(arena: Arena, a: Andante, b: Andante, radio: number = RADIO_DEL_PASEANTE): boolean {
   const dx = b.x - a.x;
   const dz = b.z - a.z;
   if (dx === 0 && dz === 0) return false;
@@ -287,45 +337,60 @@ export function cruzaUnCuerpo(arena: Arena, a: Andante, b: Andante, radio: numbe
   const mayorX = dx < 0 ? a.x : b.x;
   const menorZ = dz < 0 ? b.z : a.z;
   const mayorZ = dz < 0 ? a.z : b.z;
-  const c = arena.cuerpos;
-  for (let i = 0; i < c.length; i += 4) {
-    const x0 = (c[i] as number) - radio;
-    const z0 = (c[i + 1] as number) - radio;
-    const x1 = (c[i + 2] as number) + radio;
-    const z1 = (c[i + 3] as number) + radio;
-    /* Si la caja no pisa el rectángulo del tramo, no lo toca (y con un eje de ancho cero, también vale). */
-    if (x1 <= menorX || x0 >= mayorX || z1 <= menorZ || z0 >= mayorZ) continue;
-    /* El intervalo de `t` donde se está dentro: `desde/deDesde < t < hasta/deHasta`, empezando por [0, 1]. */
-    let desde = 0;
-    let deDesde = 1;
-    let hasta = 1;
-    let deHasta = 1;
-    let vacio = false;
-    for (const [o, d, lo, hi] of [
-      [a.x, dx, x0, x1],
-      [a.z, dz, z0, z1],
-    ] as const) {
-      if (d === 0) {
-        if (!(o > lo && o < hi)) vacio = true;
-        continue;
-      }
-      /* Con el denominador positivo: `(lo − o)/d < t < (hi − o)/d` si `d > 0`, y al revés si no. */
-      const den = d > 0 ? d : -d;
-      const nDesde = d > 0 ? lo - o : o - hi;
-      const nHasta = d > 0 ? hi - o : o - lo;
-      if (nDesde * deDesde > desde * den) {
-        desde = nDesde;
-        deDesde = den;
-      }
-      if (nHasta * deHasta < hasta * den) {
-        hasta = nHasta;
-        deHasta = den;
-      }
-    }
-    if (vacio) continue;
-    if (desde * deHasta < hasta * deDesde) return true;
+  for (let i = 0; i < arena.cuerpos.length; i += 4) {
+    if (cruzaLaCaja(arena.cuerpos, i, a, dx, dz, menorX, mayorX, menorZ, mayorZ, radio)) return true;
   }
   return false;
+}
+
+/** ¿Cruza el tramo de `a` a `a + (dx, dz)` la caja que empieza en `i`, ensanchada un radio? La cuenta exacta. */
+function cruzaLaCaja(
+  c: Int32Array,
+  i: number,
+  a: Andante,
+  dx: number,
+  dz: number,
+  menorX: number,
+  mayorX: number,
+  menorZ: number,
+  mayorZ: number,
+  radio: number,
+): boolean {
+  const x0 = (c[i] as number) - radio;
+  const z0 = (c[i + 1] as number) - radio;
+  const x1 = (c[i + 2] as number) + radio;
+  const z1 = (c[i + 3] as number) + radio;
+  /* Si la caja no pisa el rectángulo del tramo, no lo toca (y con un eje de ancho cero, también vale). */
+  if (x1 <= menorX || x0 >= mayorX || z1 <= menorZ || z0 >= mayorZ) return false;
+  /* El intervalo de `t` donde se está dentro: `desde/deDesde < t < hasta/deHasta`, empezando por [0, 1]. */
+  let desde = 0;
+  let deDesde = 1;
+  let hasta = 1;
+  let deHasta = 1;
+  let vacio = false;
+  for (const [o, d, lo, hi] of [
+    [a.x, dx, x0, x1],
+    [a.z, dz, z0, z1],
+  ] as const) {
+    if (d === 0) {
+      if (!(o > lo && o < hi)) vacio = true;
+      continue;
+    }
+    /* Con el denominador positivo: `(lo − o)/d < t < (hi − o)/d` si `d > 0`, y al revés si no. */
+    const den = d > 0 ? d : -d;
+    const nDesde = d > 0 ? lo - o : o - hi;
+    const nHasta = d > 0 ? hi - o : o - lo;
+    if (nDesde * deDesde > desde * den) {
+      desde = nDesde;
+      deDesde = den;
+    }
+    if (nHasta * deHasta < hasta * den) {
+      hasta = nHasta;
+      deHasta = den;
+    }
+  }
+  if (vacio) return false;
+  return desde * deHasta < hasta * deDesde;
 }
 
 /**
@@ -379,6 +444,8 @@ export function pasoSinCruzar(
  * clavado. El tic empieza entonces desde el sitio libre más cercano (`sitioDondeCabe`), y el
  * rescate se pinta ya hecho: `antes` es el sitio libre, para no deslizar a nadie por dentro de un
  * muro. Ver «Y NADIE SE QUEDA ENCERRADO» en la cabecera.
+ *
+ * SALVO QUE LO ÚNICO QUE LE TENGA DENTRO SEA EL ADORNO: entonces se sale andando (`salirDelAdorno`).
  */
 export function ticDelPaseo(
   arena: Arena,
@@ -387,10 +454,135 @@ export function ticDelPaseo(
   radio: number = RADIO_DEL_PASEANTE,
 ): EstadoDelPaseo {
   let desde = e.ahora;
-  if (!sePuedeEstar(arena, desde.x, desde.z, radio)) desde = sitioDondeCabe(arena, desde.x, desde.z, radio) ?? desde;
+  if (!sePuedeEstar(arena, desde.x, desde.z, radio)) {
+    const estructura = estructuraDe(arena);
+    if (estructura !== arena && sePuedeEstar(estructura, desde.x, desde.z, radio)) {
+      const fuera = salirDelAdorno(arena, estructura, desde, pedido, radio);
+      const lo = e.andado + Math.hypot(aNumero(fuera.x - desde.x), aNumero(fuera.z - desde.z));
+      return { ...e, tic: e.tic + 1, antes: desde, ahora: fuera, pedido, andado: lo };
+    }
+    desde = sitioDondeCabe(arena, desde.x, desde.z, radio) ?? desde;
+  }
   const ahora = pasoSinCruzar(arena, desde, pedido.rumbo, pedido.marcha, radio);
   const andado = e.andado + Math.hypot(aNumero(ahora.x - desde.x), aNumero(ahora.z - desde.z));
   return { ...e, tic: e.tic + 1, antes: desde, ahora, pedido, andado };
+}
+
+/* ─── Del adorno se sale andando ─────────────────────────────────────────── */
+
+/**
+ * LO QUE SE ANDA COMO MUCHO EN UN TIC SALIENDO DEL ADORNO: un tic de correr, 1,32 unidades.
+ *
+ * Es lo que el servidor acepta siempre a partir de un sitio que él mismo dio: tras un `corrige`, un
+ * `dentro` o un `renace`, el primer `aqui` tiene que caer a un tic con holgura de ese sitio
+ * (`UN_TIC_CON_HOLGURA`, 1,65 en `server/src/botas/canal.ts`), o se ignora y al segundo se le vuelve a
+ * corregir al mismo sitio: dentro del coche otra vez, para siempre.
+ */
+export const LO_QUE_SE_SALE_EN_UN_TIC = por(VELOCIDAD_CORRIENDO, DT_DEL_TIC);
+
+/**
+ * EL SITIO LIBRE MÁS CERCANO PARA SALIR DEL ADORNO: el primero, en los anillos de `sitioDondeCabe`,
+ * donde se puede estar con estructura y adorno, al que se llega en RECTA por la estructura sola
+ * (`seAndaEnRecta`: el tramo que mira el servidor) y que no es un rincón cerrado (`quedaEncerrado`).
+ * Si todos los que valen lo son, el primero de ellos; `null` si no hay ninguno a menos de 38 unidades.
+ */
+export function salidaDelAdorno(arena: Arena, estructura: Arena, desde: Andante, radio: number = RADIO_DEL_PASEANTE): Andante | null {
+  const paso = radio * 2;
+  let encerrada: Andante | null = null;
+  for (let k = 1; k <= ANILLOS_DEL_RESCATE; k++) {
+    const lejos = paso * k;
+    for (let i = 0; i < DIRECCIONES_DEL_RESCATE; i++) {
+      const r = (i * RUMBOS) / DIRECCIONES_DEL_RESCATE;
+      const cx = desde.x + por(lejos, SENO[r] as number);
+      const cz = desde.z - por(lejos, COSENO[r] as number);
+      if (!sePuedeEstar(arena, cx, cz, radio) || !seAndaEnRecta(estructura, desde, { x: cx, z: cz }, radio)) continue;
+      if (!quedaEncerrado(arena, cx, cz, radio)) return { x: cx, z: cz };
+      encerrada ??= { x: cx, z: cz };
+    }
+  }
+  return encerrada;
+}
+
+/**
+ * LO MÁS GRANDE QUE SE LLAMA RINCÓN CERRADO: 250 unidades cuadradas. Lo que el adorno deja aparte en
+ * los tres mundos medidos no pasa de 90 (`verify:paseo`), y una plaza o una calle lo pasan enseguida.
+ */
+export const AREA_DE_UN_RINCON = 250;
+const REJILLA_DEL_ENCIERRO = 0.25;
+const HOLGURA_DEL_ENCIERRO = deNumero(0.2);
+
+/**
+ * ¿ES UN RINCÓN CERRADO? Desde `(x, z)` (Q16.16) se recorre lo libre en una rejilla de un cuarto de
+ * unidad, y si se acaba antes de llegar a `AREA_DE_UN_RINCON`, es que está cerrado.
+ *
+ * Es para no salir del adorno a un BOLSILLO: entre arboledas, rocas y montañas del delta quedan claros
+ * cerrados, y en el Burgo pasillos de servicio junto a las gradas cortados por un arbusto (medidos en
+ * `verify:paseo`), y el sitio libre más cercano a quien sale de una arboleda puede estar en uno. Ahí no
+ * se podría salir andando. Por superficie y no por distancia, porque un pasillo cerrado es largo y
+ * estrecho: se alejaba mucho sin dejar de estar cerrado. Sólo se pregunta al salir del adorno, que es
+ * raro, y fuera de un rincón se llega a la superficie tope en unos cuatro mil pasos de rejilla.
+ */
+export function quedaEncerrado(arena: Arena, x: number, z: number, radio: number = RADIO_DEL_PASEANTE): boolean {
+  const celda = deNumero(REJILLA_DEL_ENCIERRO);
+  const tope = Math.ceil(AREA_DE_UN_RINCON / (REJILLA_DEL_ENCIERRO * REJILLA_DEL_ENCIERRO));
+  /* Las celdas por su par (i, j) desde el punto de partida, en una llave entera. */
+  const llave = (i: number, j: number): number => (i + 32768) * 65536 + (j + 32768);
+  const vistas = new Set<number>([llave(0, 0)]);
+  const cola: number[] = [0, 0];
+  let cabeza = 0;
+  let libres = 1;
+  while (cabeza < cola.length) {
+    const i = cola[cabeza++] as number;
+    const j = cola[cabeza++] as number;
+    for (const [vi, vj] of [
+      [i - 1, j],
+      [i + 1, j],
+      [i, j - 1],
+      [i, j + 1],
+    ] as const) {
+      const k = llave(vi, vj);
+      if (vistas.has(k)) continue;
+      vistas.add(k);
+      /* Con una holgura de un palmo: dos cajas que se tocan dejan entre ellas un hueco de ancho cero, que ninguna rejilla debe tomar por salida. */
+      if (!sePuedeEstar(arena, x + vi * celda, z + vj * celda, radio + HOLGURA_DEL_ENCIERRO)) continue;
+      if (++libres > tope) return false;
+      cola.push(vi, vj);
+    }
+  }
+  return true;
+}
+
+/**
+ * UN TIC DENTRO DEL ADORNO: hacia la salida más cercana (`salidaDelAdorno`), como mucho
+ * `LO_QUE_SE_SALE_EN_UN_TIC`, por la recta que el servidor acepta. Lo que se pulse ese tic no cuenta:
+ * primero se sale. Si no hay salida a la vista, se anda como se pida con la estructura sola —el adorno
+ * no para a quien ya está dentro de él— hasta estar fuera.
+ *
+ * ═══ POR QUÉ ANDANDO Y NO DE UN SALTO, COMO DE LA ESTRUCTURA ═══
+ *
+ * Porque el servidor no ve el adorno. Cuando pone a alguien dentro de un coche —al renacer, al
+ * entrar—, ese sitio es bueno para él, y el primer paso que se le mande tiene que caer a un tic de
+ * ahí (`LO_QUE_SE_SALE_EN_UN_TIC`). Del centro de un coche al sitio libre más cercano hay 1,65
+ * unidades o más: de un salto, el servidor lo ignoraría y le devolvería dentro al segundo. Andando,
+ * cada tic es un tramo corto y recto que acepta, y en dos o tres tics se está fuera. De la
+ * estructura sí se sale de un salto, porque ahí el servidor ya ha rescatado antes con la misma cuenta
+ * (`server/src/botas/sitios.ts`).
+ */
+export function salirDelAdorno(
+  arena: Arena,
+  estructura: Arena,
+  desde: Andante,
+  pedido: PedidoDelTic,
+  radio: number = RADIO_DEL_PASEANTE,
+): Andante {
+  const salida = salidaDelAdorno(arena, estructura, desde, radio);
+  if (salida === null) return pasoSinCruzar(estructura, desde, pedido.rumbo, pedido.marcha, radio);
+  const dx = salida.x - desde.x;
+  const dz = salida.z - desde.z;
+  const lejos = Math.hypot(dx, dz);
+  if (lejos <= LO_QUE_SE_SALE_EN_UN_TIC) return salida;
+  const f = LO_QUE_SE_SALE_EN_UN_TIC / lejos;
+  return { x: desde.x + Math.trunc(dx * f), z: desde.z + Math.trunc(dz * f) };
 }
 
 /**

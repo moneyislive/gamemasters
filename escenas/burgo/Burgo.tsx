@@ -360,7 +360,9 @@ import { NIEBLA_A_PIE, UMBRALES_A_PIE, asientoQueAnda, modoDelPaseoDe, sitioDeNa
 import { usarElPaseo } from '../paseo/usar-el-paseo';
 import { indiceDeEstorbos } from '../paseo/estorbos';
 import { rodajasDelCatalogo } from '../paseo/rodajas-del-catalogo';
-import { estorbosDelBurgo } from './estorbos-del-burgo';
+import { estorbosDelBurgo, trozosDelAdornoDelBurgo } from './estorbos-del-burgo';
+import { usarElAdorno } from '../paseo/usar-el-adorno';
+import { ALTO_DE_UNA_RODAJA_QUE_CHOCA, TOPE_DE_RODAJAS_QUE_CHOCAN } from '../paseo/adorno-que-choca';
 import { QuienAnda } from '../paseo/quien-anda';
 import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
@@ -1562,6 +1564,21 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     [aPie, catalogo, ciudad],
   );
   /*
+   * Y LO QUE PARA A QUIEN ANDA: el mismo adorno, cortado fino y por la franja del cuerpo sobre el
+   * suelo que se pisa (`adornoQueChocaDelBurgo`, ver `paseo/adorno-que-choca.ts`). Sólo en la arena
+   * de este aparato: el servidor valida con la estructura. El catálogo del Burgo va a escala 1, así
+   * que el corte fino va tal cual. Una vez por ciudad, sólo a pie, y por trozos fuera del fotograma
+   * (`usarElAdorno`): son 3.800 cajas, y de golpe darían un tirón al echar a andar.
+   */
+  const trabajoDelAdorno = useMemo(
+    () =>
+      !aPie || catalogo === null
+        ? null
+        : trozosDelAdornoDelBurgo(ciudad, rodajasDelCatalogo(catalogo, ALTO_DE_UNA_RODAJA_QUE_CHOCA, TOPE_DE_RODAJAS_QUE_CHOCAN), alturaDelSuelo),
+    [aPie, catalogo, ciudad, alturaDelSuelo],
+  );
+  const adornoAPie = usarElAdorno(trabajoDelAdorno);
+  /*
    * ═══ EL CANAL, SÓLO SI LA MESA ES DE BOTAS ═══
    *
    * Lo mismo que en `Lindes.tsx`. Sin la prop no se abre nada y `alDarUnTic` es `undefined`: una
@@ -1581,6 +1598,8 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     mandos: props.mandos,
     alturaEn: alturaDelSuelo,
     estorbos: estorbosAPie,
+    adorno: adornoAPie,
+    brotes: elCanal.brotes,
     alDarUnTic: elCanal.alDarUnTic,
     caido: elCanal.caido,
   });

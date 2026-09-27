@@ -13,14 +13,17 @@
  * Es lo único del paseo que sabe de `three`, y sólo lee: no clona nada ni toca el modelo.
  */
 import * as THREE from 'three';
-import { rodajasDeUnaMalla } from './estorbos';
+import { ALTO_DE_UNA_RODAJA, rodajasDeUnaMalla, TOPE_DE_RODAJAS } from './estorbos';
 import type { Estorbo } from './estorbos';
 
 /** Un catálogo de modelos por nombre, como lo dan `catalogoDeModelos` y el del Burgo. */
 export type CatalogoParaMedir = ReadonlyMap<string, THREE.Object3D>;
 
-/** Las rodajas de un modelo en los ejes de su raíz, malla a malla. */
-export function rodajasDelModelo(modelo: THREE.Object3D): Estorbo[] {
+/**
+ * Las rodajas de un modelo en los ejes de su raíz, malla a malla. `alto` y `tope` en unidades del
+ * MODELO, como `rodajasDeUnaMalla`: las de la vista, por defecto; las que chocan, más finas.
+ */
+export function rodajasDelModelo(modelo: THREE.Object3D, alto: number = ALTO_DE_UNA_RODAJA, tope: number = TOPE_DE_RODAJAS): Estorbo[] {
   modelo.updateWorldMatrix(true, true);
   const aLaRaiz = new THREE.Matrix4().copy(modelo.matrixWorld).invert();
   const m = new THREE.Matrix4();
@@ -40,22 +43,27 @@ export function rodajasDelModelo(modelo: THREE.Object3D): Estorbo[] {
       posiciones[i * 3 + 2] = v.z;
     }
     const indice = malla.geometry.getIndex();
-    for (const r of rodajasDeUnaMalla(posiciones, indice === null ? null : indice.array)) salida.push(r);
+    for (const r of rodajasDeUnaMalla(posiciones, indice === null ? null : indice.array, alto, tope)) salida.push(r);
   });
   return salida;
 }
 
 /**
  * LO QUE PIDE `estorbosDePiezas`: las rodajas de una pieza por su nombre, o `null` si el catálogo no
- * la tiene (y entonces no estorba). Recuerda lo medido.
+ * la tiene (y entonces no estorba). Recuerda lo medido. Con `alto` y `tope` (del modelo), otro corte:
+ * el del adorno que choca (`adorno-que-choca.ts`), más fino.
  */
-export function rodajasDelCatalogo(catalogo: CatalogoParaMedir): (pieza: string) => readonly Estorbo[] | null {
+export function rodajasDelCatalogo(
+  catalogo: CatalogoParaMedir,
+  alto: number = ALTO_DE_UNA_RODAJA,
+  tope: number = TOPE_DE_RODAJAS,
+): (pieza: string) => readonly Estorbo[] | null {
   const medidas = new Map<string, readonly Estorbo[] | null>();
   return (pieza) => {
     const hecha = medidas.get(pieza);
     if (hecha !== undefined) return hecha;
     const modelo = catalogo.get(pieza);
-    const rodajas = modelo === undefined ? null : rodajasDelModelo(modelo);
+    const rodajas = modelo === undefined ? null : rodajasDelModelo(modelo, alto, tope);
     medidas.set(pieza, rodajas);
     return rodajas;
   };

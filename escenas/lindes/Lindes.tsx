@@ -97,6 +97,8 @@ import {
   losasPorCasilla,
 } from './paseo';
 import { usarElPaseo } from '../paseo/usar-el-paseo';
+import { rodajasQueChocanDelCatalogo, sePintaLoMenudo, trozosDelAdornoDeLasLindes } from './adorno-de-las-lindes';
+import { usarElAdorno } from '../paseo/usar-el-adorno';
 import { QuienAnda } from '../paseo/quien-anda';
 import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
@@ -347,8 +349,30 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(props.canal, corregirAQuienPasea, props.alRecoger);
+  /*
+   * Y LO MENUDO, QUE PARA A QUIEN ANDA EN ESTE APARATO: barriles, carros, sacos, vallas, las rocas
+   * que no llegan a la cintura… (`adorno-de-las-lindes.ts`). No es estructura y el servidor no lo ve.
+   * Sólo si se pinta: la sobria no pinta lo menudo, y no se choca con lo que no se ve. Por trozos,
+   * fuera del fotograma (`usarElAdorno`).
+   */
+  const trabajoDelAdorno = useMemo(
+    () =>
+      !aPie || catalogo === null
+        ? null
+        : trozosDelAdornoDeLasLindes(
+            tablero.losas,
+            semilla,
+            rodajasQueChocanDelCatalogo(catalogo.partes),
+            (pieza) => ejeDelLargo(cajaDelModelo(catalogo, pieza)),
+            sePintaLoMenudo(calidad),
+          ),
+    [aPie, catalogo, tablero.losas, semilla, calidad],
+  );
+  const adorno = usarElAdorno(trabajoDelAdorno);
   const paseo = usarElPaseo({
     mundo,
+    adorno,
+    brotes: elCanal.brotes,
     nace,
     modo: camara.modo,
     mandos: props.mandos,

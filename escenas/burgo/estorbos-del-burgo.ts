@@ -25,7 +25,17 @@
  *
  * Es la ciudad de la calidad del aparato, la que se pinta: en sobria hay menos adorno y estorba
  * menos, que es lo justo.
+ *
+ * ═══ Y DESDE EL MISMO 27-SEP, TAMBIÉN LO QUE CHOCA ═══
+ *
+ * Miguel: «el avatar atraviesa los objetos medianos y pequeños». El mismo adorno para ya a quien anda
+ * en este aparato (`adornoQueChocaDelBurgo`, con `escenas/paseo/adorno-que-choca.ts`): el mobiliario y
+ * los coches aparcados por lo que tienen a la altura del cuerpo, y los bultos que son un sólido
+ * (`BULTOS_QUE_CHOCAN`). Lo que se pisa o va por encima de la cabeza, no. El servidor sigue sin verlo.
  */
+import type { Cuerpo } from '../../shared/mecanicas/mundo';
+import { hacerLosTrozos, plantasQueChocan, trozosDePiezas } from '../paseo/adorno-que-choca';
+import type { TrozoDelAdorno } from '../paseo/adorno-que-choca';
 import type { Estorbo } from '../paseo/estorbos';
 import { estorbosDePiezas } from '../paseo/estorbos';
 import type { BultoPropio, ClaseDeBulto, LaCiudad } from './ciudad';
@@ -85,4 +95,88 @@ export function estorbosDelBurgo(ciudad: LaCiudad, rodajasDe: (pieza: string) =>
     salida.push(cajaDelBulto(b));
   }
   return salida;
+}
+
+/* ─── Y LO QUE CHOCA ─────────────────────────────────────────────────────── */
+
+/**
+ * LOS BULTOS PROPIOS QUE PARAN A QUIEN ANDA, clase a clase: una tabla ENTERA y no una lista, para que
+ * una clase nueva no choque ni se atraviese sin que nadie lo haya decidido (TypeScript pide la fila).
+ *
+ *   · CHOCAN los que son un sólido a la altura del cuerpo: los pilares de la obra, los surtidores de
+ *     la gasolinera, las gradas, el pedestal y el templete.
+ *   · NO chocan los que se pisan (los mismos que `SUELOS_QUE_SE_PISAN` de `a-pie.ts`: andenes,
+ *     forjados, puentes, céspedes, asfalto…), los que van por encima de la cabeza (marquesinas,
+ *     toldos, porches, el brazo de la grúa), el agua y el estanque, lo que ya es estructura (las
+ *     torres, las naves y los cantiles del canal: `mundoDelBurgo`), y la ciudad de lejos y lo de
+ *     dentro de un edificio abierto (`CLASES_QUE_NO_TAPAN`).
+ */
+export const BULTOS_QUE_CHOCAN: Readonly<Record<ClaseDeBulto, boolean>> = {
+  'losa-de-sala': false,
+  tabique: false,
+  techo: false,
+  escalera: false,
+  cubierta: false,
+  medianera: false,
+  torre: false,
+  jardin: false,
+  pradera: false,
+  estanque: false,
+  templete: true,
+  tierra: false,
+  asfalto: false,
+  'plaza-de-aparcamiento': false,
+  nave: false,
+  gradas: true,
+  isleta: false,
+  pedestal: true,
+  cesped: false,
+  via: false,
+  anden: false,
+  marquesina: false,
+  agua: false,
+  cantil: false,
+  puente: false,
+  'pista-de-colegio': false,
+  surtidor: true,
+  forjado: false,
+  pilar: true,
+  'brazo-de-grua': false,
+  toldo: false,
+  porche: false,
+  prisma: false,
+  'manzana-fundida': false,
+};
+
+/**
+ * EL ADORNO DE UNA CIUDAD DEL BURGO QUE PARA A QUIEN ANDA (`escenas/paseo/adorno-que-choca.ts`): el
+ * mobiliario y los coches aparcados por sus rodajas finas (`rodajasDe`, medidas en el catálogo que
+ * se pinta), y los bultos de `BULTOS_QUE_CHOCAN` por su caja. `sueloEn` es el suelo que pisa quien
+ * anda (`sueloDelBurgo`): de él cuelga la franja del cuerpo. Todo el mobiliario choca —ninguna pieza
+ * del Burgo se anda por encima—, y lo que no llega al tobillo se queda fuera solo.
+ */
+export function adornoQueChocaDelBurgo(
+  ciudad: LaCiudad,
+  rodajasDe: (pieza: string) => readonly Estorbo[] | null,
+  sueloEn: (x: number, z: number) => number,
+): Cuerpo[] {
+  return hacerLosTrozos(trozosDelAdornoDelBurgo(ciudad, rodajasDe, sueloEn));
+}
+
+/** Lo mismo en trozos, para montarlo sin tirones (`usarElAdorno`): las piezas de 256 en 256, y los bultos al final. */
+export function trozosDelAdornoDelBurgo(
+  ciudad: LaCiudad,
+  rodajasDe: (pieza: string) => readonly Estorbo[] | null,
+  sueloEn: (x: number, z: number) => number,
+): TrozoDelAdorno[] {
+  const trozos = trozosDePiezas([...ciudad.mobiliario, ...ciudad.coches.aparcados], rodajasDe, sueloEn);
+  trozos.push(() => {
+    const salida: Cuerpo[] = [];
+    for (const b of ciudad.fachadas) {
+      if (!BULTOS_QUE_CHOCAN[b.clase]) continue;
+      for (const c of plantasQueChocan([cajaDelBulto(b)], sueloEn(b.x, b.z))) salida.push(c);
+    }
+    return salida;
+  });
+  return trozos;
 }

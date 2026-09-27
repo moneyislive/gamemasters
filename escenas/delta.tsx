@@ -280,7 +280,10 @@ import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, IslaEn3D, PiezaEn3D } from 
  * `verify:escena` la mida; el componente, en `andar-por-el-delta.tsx`.
  */
 import { AndarPorElDelta } from './andar-por-el-delta';
-import { estorbosDelDelta } from './estorbos-del-delta';
+import { estorbosDelDelta, trozosDelAdornoDelDelta } from './estorbos-del-delta';
+import { usarElAdorno } from './paseo/usar-el-adorno';
+import { ALTO_DE_UNA_RODAJA_QUE_CHOCA, TOPE_DE_RODAJAS_QUE_CHOCAN } from './paseo/adorno-que-choca';
+import { alturaAPie, sueloPintadoDe } from './delta-a-pie';
 import { indiceDeEstorbos } from './paseo/estorbos';
 import { rodajasDelCatalogo } from './paseo/rodajas-del-catalogo';
 import type { ModoDeCamaraDelDelta } from './delta-a-pie';
@@ -4391,6 +4394,20 @@ export function Delta({
     () => (aPieEnElDelta ? indiceDeEstorbos(estorbosDelDelta(plan.cosas, plan.caserio, rodajasDelCatalogo(modelos))) : null),
     [aPieEnElDelta, plan, modelos],
   );
+  /*
+   * Y LO QUE PARA A QUIEN ANDA: el mismo adorno, cortado fino —el pack se pinta a `ESCALA_DEL_PACK`,
+   * así que el corte del mundo se pasa a unidades del modelo— y por la franja del cuerpo sobre la
+   * altura a la que se anda (`adornoQueChocaDelDelta`, ver `paseo/adorno-que-choca.ts`). Sólo en la
+   * arena de este aparato: el servidor valida con la estructura. Por trozos, fuera del fotograma
+   * (`usarElAdorno`).
+   */
+  const trabajoDelAdorno = useMemo(() => {
+    if (!aPieEnElDelta) return null;
+    const suelo = sueloPintadoDe(relieve);
+    const rodajas = rodajasDelCatalogo(modelos, ALTO_DE_UNA_RODAJA_QUE_CHOCA / ESCALA_DEL_PACK, TOPE_DE_RODAJAS_QUE_CHOCAN);
+    return trozosDelAdornoDelDelta(plan.cosas, plan.caserio, rodajas, (x, z) => alturaAPie(suelo, x, z));
+  }, [aPieEnElDelta, plan, modelos, relieve]);
+  const adornoAPie = usarElAdorno(trabajoDelAdorno);
 
   /**
    * LAS GEOMETRÍAS DE SUELO, una por pieza y bioma, y sólo las que se usan.
@@ -4864,6 +4881,7 @@ export function Delta({
           canal={canal}
           alRecoger={alRecoger}
           estorbos={estorbosAPie}
+          adorno={adornoAPie}
         />
       ) : null}
     </group>

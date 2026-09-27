@@ -13,7 +13,9 @@
  *
  *  1. La arena sale del mundo UNA vez por mundo, con `useMemo`: en Las Lindes el mundo cambia al
  *     poner una losa, no a cada fotograma, y derivarla sesenta veces por segundo sería rehacer
- *     el índice de cajones de tres mil cuerpos para no cambiar nada.
+ *     el índice de cajones de tres mil cuerpos para no cambiar nada. Si el juego da ADORNO QUE
+ *     CHOCA (`adorno`, ver `adorno-que-choca.ts`), sus plantas se suman a los cuerpos del mundo
+ *     en esa misma arena, que lleva dentro la de la estructura sola (`estructuraDe`).
  *  2. Se suman las dos manos: el teclado, que se lee aquí si hay `document`, y los mandos de
  *     fuera, que la app escribe en una referencia.
  *  3. Se dan los tics que caben (`fotogramaDeQuienPasea`, en `paseante.ts`), con el paso de
@@ -58,23 +60,27 @@
  *    primer fotograma a pie con mundo, y nada ordena las dos cosas: si el `dentro` llega antes, no
  *    había nadie a quien poner, se nacía donde dice el mundo y el primer tic salía de otro sitio,
  *    que el servidor devolvería con un `corrige`. Ahora el sitio se guarda y se nace en él.
- *  · SI AHÍ NO SE CABE, SE APARTA AL SITIO LIBRE MÁS CERCANO (`mudarDeMundo`). El servidor valida
- *    contra la ESTRUCTURA del mundo, y un aparato que anduviera con estructura y ADORNO podría
- *    recibir un sitio bueno para el servidor dentro de un barril suyo, y desde dentro de una caja el
- *    paso no deja salir. Hoy los tres juegos que se andan le dan al paseo la MISMA estructura que el
- *    servidor (`mundoDelBurgo`, `mundoDeRiberas`, `mundoDeLasLindes`) y el adorno se atraviesa, así
- *    que esto no salta; queda como red, y además cada tic rescata a quien empiece dentro de algo
- *    (`ticDelPaseo`, en `paseante.ts`).
+ *  · SI AHÍ NO SE CABE POR LA ESTRUCTURA, SE APARTA AL SITIO LIBRE MÁS CERCANO (`mudarDeMundo`, con
+ *    la arena de la ESTRUCTURA sola: `estructuraDe`). Es lo que haría el servidor, que valida contra
+ *    ella y rescata con la misma cuenta, así que el salto no le sorprende.
+ *  · Y SI LO ÚNICO QUE LE TIENE DENTRO ES EL ADORNO, NO SE SALTA: se sale ANDANDO en los tics que
+ *    siguen (`ticDelPaseo` y `salirDelAdorno`, en `paseante.ts`). Desde el 27-sep-2026 el aparato
+ *    anda con estructura y adorno, y el servidor puede poner a alguien —al entrar, al renacer—
+ *    dentro de un coche que él no ve. Un salto al sitio libre más cercano cae a más de un tic de
+ *    donde el servidor espera el primer paso, y lo ignoraría y le devolvería dentro al segundo; un
+ *    tic de correr por tic, en recta por la estructura, lo acepta siempre.
  *
  * ═══ Y LA CÁMARA DE HOMBRO NO ATRAVIESA ═══
  *
  * Cada fotograma se mira hasta dónde cabe detrás de quien pasea (`hastaDondeCabeElHombro`) y la
  * cámara se acerca o se aleja hacia eso sin saltar (`acercarElHombro`). El porqué y los números
- * están en `camaras.ts`.
+ * están en `camaras.ts`. Se mira con la arena de la ESTRUCTURA: con el adorno que choca dentro, la
+ * cámara se echaría a la nuca detrás de cada banco, que queda por debajo de su línea.
  *
  * Y si el juego declara lo que ESTORBA A LA VISTA (`estorbos`, ver `estorbos.ts`), también hasta
  * dónde puede irse sin que el adorno se le ponga delante (`hastaDondeNoTapa`), y manda el menor. La
- * arena es sólo estructura: sin esto la cámara se quedaba detrás de una señal de tráfico del Burgo.
+ * arena de la estructura no sabe del adorno: sin esto la cámara se quedaba detrás de una señal de
+ * tráfico del Burgo.
  *
  * ═══ LA REFRIEGA: LA G, EL BOTÓN, Y EL SUELO ═══
  *
@@ -95,7 +101,9 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { arenaDe } from '../../shared/mecanicas/mundo';
-import type { Andante, Arena, MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
+import type { Andante, Arena, Cuerpo, MundoDeclarado, Sitio } from '../../shared/mecanicas/mundo';
+import { adornoQueDejaLlegarALosBrotes, arenaDelPaseo, estructuraDe, sinLoQueCierraElPaso } from './adorno-que-choca';
+import type { SitioDeUnBrote } from './adorno-que-choca';
 import { acercarElHombro, camaraDeHombro, camaraDeOjos, hastaDondeCabeElHombro, hastaDondeNoTapa } from './camaras';
 import type { EstorbosDelPaseo } from './estorbos';
 import { esTeclaDeOtro, esUnGolpe, SIN_MANDOS_DE_FUERA, SIN_TECLAS, teclaDelPaseo } from './mandos';
@@ -144,6 +152,17 @@ export interface OpcionesDelPaseo {
    * viaja: sólo aparta la cámara de hombro de lo que se le pondría delante. Sin él, sólo la arena.
    */
   readonly estorbos?: EstorbosDelPaseo | null;
+  /**
+   * EL ADORNO QUE CHOCA: la planta de lo que se pinta a la altura del cuerpo (`adorno-que-choca.ts`).
+   * Se suma a los cuerpos del mundo en la arena de ESTE aparato, y el servidor no lo ve. Se deriva
+   * una vez por mundo y adorno, como la arena. Sin él, sólo el mundo.
+   */
+  readonly adorno?: readonly Cuerpo[] | null;
+  /**
+   * Los brotes de hallazgo vivos (el `brotes` del canal). El adorno que queda cerca de uno deja de
+   * chocar mientras esté, para que se pueda llegar a cogerlo (`adornoQueDejaLlegarALosBrotes`).
+   */
+  readonly brotes?: readonly SitioDeUnBrote[];
   /** La costura (a) con la red: lo pedido en cada tic y dónde se acabó. */
   readonly alDarUnTic?: (entrada: EntradaDelTic, sitio: Andante) => void;
   /**
@@ -174,7 +193,17 @@ function asentar(pintada: { current: number | null }, deVerdad: number, cuanto: 
 
 export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
   const aPie = o.modo !== 'mesa';
-  const arena = useMemo(() => (o.mundo === null ? null : arenaDe(o.mundo)), [o.mundo]);
+  const estructura = useMemo(() => (o.mundo === null ? null : arenaDe(o.mundo)), [o.mundo]);
+  /* Lo que cierra un paso, fuera una vez por adorno; lo que tapa un brote, cada vez que cambian (ver `adorno-que-choca.ts`). */
+  const abierto = useMemo(
+    () => (o.adorno === null || o.adorno === undefined || estructura === null ? null : sinLoQueCierraElPaso(o.adorno, estructura)),
+    [o.adorno, estructura],
+  );
+  const adorno = useMemo(() => adornoQueDejaLlegarALosBrotes(abierto, o.brotes), [abierto, o.brotes]);
+  const arena = useMemo(
+    () => (o.mundo === null || estructura === null ? null : arenaDelPaseo(o.mundo, adorno, estructura, true)),
+    [o.mundo, estructura, adorno],
+  );
   const estado = useRef<{ readonly arena: Arena; readonly paseo: EstadoDelPaseo } | null>(null);
   const teclas = useRef<Teclas>(SIN_TECLAS);
   const pose = useRef<PaseoPintado>(SIN_NACER);
@@ -268,10 +297,10 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
       pendiente.current = null;
       actual = {
         arena,
-        paseo: dicho === null ? nacido : mudarDeMundo(arena, corregirElPaseo(nacido, dicho.sitio, dicho.rumbo)),
+        paseo: dicho === null ? nacido : mudarDeMundo(estructuraDe(arena), corregirElPaseo(nacido, dicho.sitio, dicho.rumbo)),
       };
     } else if (actual.arena !== arena) {
-      actual = { arena, paseo: mudarDeMundo(arena, actual.paseo) };
+      actual = { arena, paseo: mudarDeMundo(estructuraDe(arena), actual.paseo) };
     }
 
     /* ── Los tics, con el golpe pendiente; y en el suelo, ninguno (`fotogramaDeQuienPasea`) ── */
@@ -304,7 +333,7 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
     let atras: number | null = null;
     if (o.modo !== 'ojos') {
       /* Y sin quedarse detrás del adorno que el juego declare: el menor de los dos (ver `camaras.ts`). */
-      const cabe = hastaDondeCabeElHombro(arena, p);
+      const cabe = hastaDondeCabeElHombro(estructuraDe(arena), p);
       const noTapa = o.estorbos === undefined || o.estorbos === null ? cabe : hastaDondeNoTapa(o.estorbos, p, suelo, cabe, y);
       atras = acercarElHombro(atrasDelHombro.current, Math.min(cabe, noTapa), dt);
     }
@@ -320,7 +349,7 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
       pendiente.current = { sitio, rumbo };
       return;
     }
-    estado.current = { arena: actual.arena, paseo: mudarDeMundo(actual.arena, corregirElPaseo(actual.paseo, sitio, rumbo)) };
+    estado.current = { arena: actual.arena, paseo: mudarDeMundo(estructuraDe(actual.arena), corregirElPaseo(actual.paseo, sitio, rumbo)) };
   }, []);
 
   return useMemo(() => ({ pose, corregir }), [corregir]);

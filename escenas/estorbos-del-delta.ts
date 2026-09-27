@@ -23,7 +23,17 @@
  * casi llanos, y su tablero queda por debajo de la línea que va de la cámara a la cabeza.
  *
  * Esto es presentación y va en coma flotante: nada de aquí decide dónde se está.
+ *
+ * ═══ Y DESDE EL 27-SEP-2026, TAMBIÉN LO QUE CHOCA ═══
+ *
+ * El mismo adorno para a quien anda (`adornoQueChocaDelDelta`, con `escenas/paseo/adorno-que-choca.ts`):
+ * árboles, rocas, casas del caserío, carros, montañas, vallas. Salvo lo que se anda por encima o es
+ * suelo (`noChocaEnElDelta`): el puente, los muelles, los juncos y los nenúfares, el trigal y el
+ * barbecho.
  */
+import type { Cuerpo } from '../shared/mecanicas/mundo';
+import { hacerLosTrozos, trozosDePiezas } from './paseo/adorno-que-choca';
+import type { TrozoDelAdorno } from './paseo/adorno-que-choca';
 import type { Estorbo, PiezaPuesta } from './paseo/estorbos';
 import { estorbosDePiezas } from './paseo/estorbos';
 
@@ -63,4 +73,46 @@ export function estorbosDelDelta(
   rodajasDe: (pieza: string) => readonly Estorbo[] | null,
 ): Estorbo[] {
   return estorbosDePiezas(piezasDelAdorno(cosas, caserio), rodajasDe);
+}
+
+/**
+ * LO DEL ADORNO DEL DELTA QUE NO PARA A NADIE, por el nombre de su modelo: lo que se anda por encima
+ * —el puente, los muelles de cada color— y lo que es suelo o agua —los juncos y los nenúfares de las
+ * orillas, el trigal y el barbecho, que son el campo mismo—. Lo demás choca por la parte que tiene a
+ * la altura del cuerpo.
+ */
+export function noChocaEnElDelta(pieza: string): boolean {
+  return (
+    pieza === 'puente' ||
+    pieza.startsWith('muelle') ||
+    pieza.startsWith('junco-') ||
+    pieza.startsWith('nenufar-') ||
+    pieza === 'trigal' ||
+    pieza === 'barbecho'
+  );
+}
+
+/**
+ * EL ADORNO DEL DELTA QUE PARA A QUIEN ANDA: las piezas del plan y del caserío por sus rodajas finas
+ * (`rodajasDe`, medidas en el catálogo que se pinta), sin las de `noChocaEnElDelta`. `sueloEn` es la
+ * altura a la que se pinta a quien anda (`alturaAPie`): de ahí cuelga la franja del cuerpo.
+ */
+export function adornoQueChocaDelDelta(
+  cosas: ReadonlyMap<string, readonly CopiaDelAdorno[]>,
+  caserio: readonly { readonly modelo: string; readonly puesta: CopiaDelAdorno }[],
+  rodajasDe: (pieza: string) => readonly Estorbo[] | null,
+  sueloEn: (x: number, z: number) => number,
+): Cuerpo[] {
+  return hacerLosTrozos(trozosDelAdornoDelDelta(cosas, caserio, rodajasDe, sueloEn));
+}
+
+/** Lo mismo en trozos de 256 piezas, para montarlo sin tirones (`usarElAdorno`). */
+export function trozosDelAdornoDelDelta(
+  cosas: ReadonlyMap<string, readonly CopiaDelAdorno[]>,
+  caserio: readonly { readonly modelo: string; readonly puesta: CopiaDelAdorno }[],
+  rodajasDe: (pieza: string) => readonly Estorbo[] | null,
+  sueloEn: (x: number, z: number) => number,
+): TrozoDelAdorno[] {
+  const puestas = piezasDelAdorno(cosas, caserio).filter((p) => !noChocaEnElDelta(p.pieza));
+  return trozosDePiezas(puestas, rodajasDe, sueloEn);
 }

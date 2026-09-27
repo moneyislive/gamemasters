@@ -27,6 +27,9 @@
  *     prueba ni junto a las torres del centro del Burgo de verdad.
  *  7c. LA CÁMARA NO SE QUEDA DETRÁS DEL ADORNO: una señal o un semáforo declarados la acercan, por
  *     debajo del brazo de un semáforo no, y en el Burgo ABCD con su adorno ninguno se le pone delante.
+ *  7d. EL ADORNO CHOCA (`paseo-con-adorno.ts`): por el poste de un semáforo sí y bajo su brazo no, lo
+ *     que se pisa no, nadie nace ni queda encerrado en el adorno de los tres mundos, del adorno se sale
+ *     andando por donde el servidor acepta, a los brotes se llega, y la cámara ya no da el tirón.
  *  8. EL GOLPE Y EL SUELO. La G golpea y no se come la de un campo de texto; un toque es un golpe,
  *     en el primer tic que se dé y en uno solo; y en el suelo no se da ni un tic.
  *  9. EL MONTAJE. Que la escena y la app usan esto y no otra cosa: se mira en el fuente, que es
@@ -92,6 +95,7 @@ import {
 } from '../paseo/paseante';
 import type { EstadoDelPaseo } from '../paseo/paseante';
 import { clipDelPaso, CORRE_A_PARTIR_DE, ritmoDelClip, ZANCADA_DE_ANDAR, ZANCADA_DE_CORRER } from '../paseo/zancada';
+import { medirElAdornoQueChoca } from './paseo-con-adorno';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -1254,6 +1258,8 @@ paso('El golpe y el suelo: la G golpea sin comerse la de un campo, un toque es u
 }
 
 // ---------------------------------------------------------------------------
+await medirElAdornoQueChoca(comprobar, paso);
+
 paso('El montaje: la escena y la app usan esto, y no otra cosa');
 // ---------------------------------------------------------------------------
 
@@ -1279,8 +1285,11 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
     /if \(pulsada && esTeclaDeOtro\(/.test(gancho) && /if \(pulsada\) e\.preventDefault\(\);/.test(gancho),
   );
   comprobar(
-    'el gancho deriva la arena UNA vez por mundo, con `useMemo`, y sin mundo no la deriva',
-    /useMemo\(\(\) => \(o\.mundo === null \? null : arenaDe\(o\.mundo\)\), \[o\.mundo\]\)/.test(gancho),
+    'el gancho deriva la arena UNA vez por mundo y adorno, con `useMemo`, y sin mundo no la deriva',
+    /const estructura = useMemo\(\(\) => \(o\.mundo === null \? null : arenaDe\(o\.mundo\)\), \[o\.mundo\]\);/.test(gancho) &&
+      /const abierto = useMemo\(\s*\(\) => \(o\.adorno === null \|\| o\.adorno === undefined \|\| estructura === null \? null : sinLoQueCierraElPaso\(o\.adorno, estructura\)\),\s*\[o\.adorno, estructura\],\s*\);/.test(gancho) &&
+      /const adorno = useMemo\(\(\) => adornoQueDejaLlegarALosBrotes\(abierto, o\.brotes\), \[abierto, o\.brotes\]\);/.test(gancho) &&
+      /const arena = useMemo\(\s*\(\) => \(o\.mundo === null \|\| estructura === null \? null : arenaDelPaseo\(o\.mundo, adorno, estructura, true\)\),\s*\[o\.mundo, estructura, adorno\],\s*\);/.test(gancho),
   );
   comprobar(
     'y corre antes que nadie: su `useFrame` lleva prioridad −1',
@@ -1293,7 +1302,7 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
    */
   const burgo = leer('./../burgo/Burgo.tsx');
   const miraLoQueEstorba = (c: string): boolean =>
-    /const cabe = hastaDondeCabeElHombro\(arena, p\);\s*const noTapa = o\.estorbos === undefined \|\| o\.estorbos === null \? cabe : hastaDondeNoTapa\(o\.estorbos, p, suelo, cabe, y\);\s*atras = acercarElHombro\(atrasDelHombro\.current, Math\.min\(cabe, noTapa\), dt\);/.test(
+    /const cabe = hastaDondeCabeElHombro\(estructuraDe\(arena\), p\);\s*const noTapa = o\.estorbos === undefined \|\| o\.estorbos === null \? cabe : hastaDondeNoTapa\(o\.estorbos, p, suelo, cabe, y\);\s*atras = acercarElHombro\(atrasDelHombro\.current, Math\.min\(cabe, noTapa\), dt\);/.test(
       c,
     );
   const elBurgoLoDa = (c: string): boolean =>
@@ -1350,11 +1359,47 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
   const elDeltaLoDa = (d: string, a: string): boolean =>
     /indiceDeEstorbos\(estorbosDelDelta\(plan\.cosas, plan\.caserio, rodajasDelCatalogo\(modelos\)\)\)/.test(d) &&
     /<AndarPorElDelta[^>]*\bestorbos=\{estorbosAPie\}/.test(d) &&
-    /usarElPaseo\(\{[^}]*\bestorbos \}\)/.test(a);
+    /usarElPaseo\(\{[^}]*\bestorbos, adorno, brotes: elCanal\.brotes \}\)/.test(a);
   comprobar('y el delta se lo da al paseo, medido en el catálogo que pinta', elDeltaLoDa(delta, andar));
   comprobar(
     'y se ve caer: con un delta que no pasa su adorno, o con un paseo del delta que no lo recibe',
-    !elDeltaLoDa(delta.replace('estorbos={estorbosAPie}', ''), andar) && !elDeltaLoDa(delta, andar.replace(', estorbos })', ' })')),
+    !elDeltaLoDa(delta.replace('estorbos={estorbosAPie}', ''), andar) && !elDeltaLoDa(delta, andar.replace(', estorbos, adorno,', ', adorno,')),
+  );
+  /*
+   * Y EL ADORNO QUE CHOCA (27-sep): los tres juegos que se andan le dan al paseo su adorno, cortado
+   * fino, montado por trozos fuera del fotograma (`usarElAdorno`), con los brotes vivos del canal. Se
+   * ve caer quitándole a cualquiera de los tres la prop, o montándolo de golpe con un `useMemo`.
+   */
+  const lindes = leer('./../lindes/Lindes.tsx');
+  const losTresLoDan = (b: string, d: string, a: string, l: string): boolean =>
+    /const trabajoDelAdorno = useMemo\(\s*\(\) =>\s*!aPie \|\| catalogo === null\s*\? null\s*: trozosDelAdornoDelBurgo\(ciudad, rodajasDelCatalogo\(catalogo, ALTO_DE_UNA_RODAJA_QUE_CHOCA, TOPE_DE_RODAJAS_QUE_CHOCAN\), alturaDelSuelo\),/.test(b) &&
+    /const adornoAPie = usarElAdorno\(trabajoDelAdorno\);/.test(b) &&
+    /usarElPaseo\(\{[^}]*\badorno: adornoAPie,\s*brotes: elCanal\.brotes,[^}]*\}\)/.test(b) &&
+    /return trozosDelAdornoDelDelta\(plan\.cosas, plan\.caserio, rodajas, \(x, z\) => alturaAPie\(suelo, x, z\)\);/.test(d) &&
+    /rodajasDelCatalogo\(modelos, ALTO_DE_UNA_RODAJA_QUE_CHOCA \/ ESCALA_DEL_PACK, TOPE_DE_RODAJAS_QUE_CHOCAN\)/.test(d) &&
+    /const adornoAPie = usarElAdorno\(trabajoDelAdorno\);/.test(d) &&
+    /<AndarPorElDelta[^>]*\badorno=\{adornoAPie\}/.test(d) &&
+    /usarElPaseo\(\{[^}]*\badorno, brotes: elCanal\.brotes \}\)/.test(a) &&
+    /: trozosDelAdornoDeLasLindes\(\s*tablero\.losas,\s*semilla,\s*rodajasQueChocanDelCatalogo\(catalogo\.partes\),\s*\(pieza\) => ejeDelLargo\(cajaDelModelo\(catalogo, pieza\)\),\s*sePintaLoMenudo\(calidad\),\s*\)/.test(l) &&
+    /const adorno = usarElAdorno\(trabajoDelAdorno\);/.test(l) &&
+    /usarElPaseo\(\{\s*mundo,\s*adorno,\s*brotes: elCanal\.brotes,/.test(l);
+  comprobar('los tres juegos que se andan le dan al paseo su adorno que choca, por trozos y con los brotes vivos', losTresLoDan(burgo, delta, andar, lindes));
+  comprobar(
+    'y se ve caer: un Burgo, un delta o unas Lindes que no lo pasan, o que lo montan de golpe',
+    !losTresLoDan(burgo.replace('    adorno: adornoAPie,\n', ''), delta, andar, lindes) &&
+      !losTresLoDan(burgo, delta.replace('adorno={adornoAPie}', ''), andar, lindes) &&
+      !losTresLoDan(burgo, delta, andar, lindes.replace('    adorno,\n    brotes', '    brotes')) &&
+      !losTresLoDan(burgo.replace('usarElAdorno(trabajoDelAdorno)', 'useMemo(() => hacerLosTrozos(trabajoDelAdorno ?? []), [trabajoDelAdorno])'), delta, andar, lindes),
+  );
+  /* Y la corrección de la red, el nacer en lo que dijo y el cambio de mundo apartan por la ESTRUCTURA: del adorno se sale andando. */
+  const apartaPorLaEstructura = (c: string): boolean =>
+    /mudarDeMundo\(estructuraDe\(arena\), corregirElPaseo\(nacido, dicho\.sitio, dicho\.rumbo\)\)/.test(c) &&
+    /paseo: mudarDeMundo\(estructuraDe\(arena\), actual\.paseo\)/.test(c) &&
+    /mudarDeMundo\(estructuraDe\(actual\.arena\), corregirElPaseo\(actual\.paseo, sitio, rumbo\)\)/.test(c);
+  comprobar('la corrección de la red y el cambio de mundo apartan sólo de la estructura, como el servidor', apartaPorLaEstructura(gancho));
+  comprobar(
+    'y se ve caer: una corrección que apartara también del adorno',
+    !apartaPorLaEstructura(gancho.replace('mudarDeMundo(estructuraDe(actual.arena), corregirElPaseo', 'mudarDeMundo(actual.arena, corregirElPaseo')),
   );
   /*
    * EL FOTOGRAMA DEL GANCHO ES EL MEDIDO ARRIBA: `fotogramaDeQuienPasea`, con las teclas, los mandos
@@ -1452,6 +1497,7 @@ console.log(`${hechas} comprobaciones`);
 console.log('\nEl reloj cuenta tics enteros y no se desboca, se pinta entre los dos últimos, las teclas y la');
 console.log('palanca piden lo que tienen que pedir, la muralla para y deja resbalar, la marioneta se queda');
 console.log('quieta contra ella y corre al correr sin patinar, lo pedido basta para rehacer el camino, nadie');
-console.log('se queda encerrado ni clavado, ningún paso salta una rendija, la cámara no se queda detrás del');
+console.log('se queda encerrado ni clavado, ningún paso salta una rendija, el adorno choca por lo que tiene a la');
+console.log('altura del cuerpo y de él se sale andando, la cámara no se queda detrás del');
 console.log('adorno, la G golpea sin comerse la de un campo y un toque es un golpe en un solo tic, en el suelo');
 console.log('no se anda, y la escena y la app montan justo esto.');

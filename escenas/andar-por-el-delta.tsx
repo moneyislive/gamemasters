@@ -56,7 +56,7 @@ import type { JSX } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { mundoDeRiberas } from '../shared/arcade/juegos/riberas-mundo';
-import type { Andante, MundoDeclarado } from '../shared/mecanicas/mundo';
+import type { Andante, Cuerpo, MundoDeclarado } from '../shared/mecanicas/mundo';
 import type { Traer } from './embarcadero/tipos';
 import { LosDemas } from './paseo/los-demas';
 import { LosHallazgos } from './paseo/los-hallazgos';
@@ -101,9 +101,14 @@ export interface AndarPorElDeltaProps {
    * de hombro no se queda detrás de él; no choca ni viaja. Sin él, sólo la arena, como antes.
    */
   readonly estorbos?: EstorbosDelPaseo | null;
+  /**
+   * EL ADORNO QUE CHOCA: la planta de lo que se pinta a la altura del cuerpo (`adornoQueChocaDelDelta`).
+   * Para a quien anda en este aparato; el servidor no lo ve. Sin él, sólo el mundo.
+   */
+  readonly adorno?: readonly Cuerpo[] | null;
 }
 
-export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal, alRecoger, estorbos }: AndarPorElDeltaProps): JSX.Element | null {
+export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal, alRecoger, estorbos, adorno }: AndarPorElDeltaProps): JSX.Element | null {
   const aPie = camara.modo !== 'mesa';
   const asiento = camara.modo === 'mesa' ? '' : camara.asiento;
 
@@ -140,7 +145,7 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos,
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(canal, corregirAQuienPasea, alRecoger);
-  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic, caido: elCanal.caido, estorbos });
+  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic, caido: elCanal.caido, estorbos, adorno, brotes: elCanal.brotes });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
   }, [paseo.corregir]);

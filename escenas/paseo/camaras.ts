@@ -41,6 +41,16 @@
  * arena, mira hasta dónde puede irse sin que ninguna caja se ponga entre ella y el pecho de quien
  * pasea (`hastaDondeNoTapa`). Se queda con el menor de los dos y lo alcanza igual, con
  * `acercarElHombro`: se acerca deprisa ante la señal y se aleja despacio al dejarla atrás.
+ *
+ * ═══ EL «EFECTO DE QUEDARSE ATRÁS» ERA ESTO ═══
+ *
+ * Mientras el adorno se atravesaba, salir por detrás de un pino o de un semáforo dejaba la pieza entre
+ * la cámara y el pecho a menos de un paso: la cámara se echaba a la nuca en un décimo de segundo (1,82
+ * unidades en un fotograma, medido) y volvía a su sitio a tres por segundo, mientras quien pasea se
+ * alejaba a doce. Se veía como si el avatar se quedara atrás. Desde que el adorno choca
+ * (`adorno-que-choca.ts`) no se sale nunca por detrás de nada, y `verify:paseo` mide que el tirón no
+ * vuelve. La arena con la que se mira lo que cabe detrás sigue siendo la de la ESTRUCTURA
+ * (`estructuraDe`): con el adorno dentro, la cámara se echaría encima detrás de cada banco.
  */
 import { RADIO_DEL_PASEANTE } from '../../shared/mecanicas/andar';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';

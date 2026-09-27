@@ -377,6 +377,15 @@ haya piso, que no esté dentro de un cuerpo— y si no cuadra lo devuelve al úl
 **El combate y el botín los decide siempre el servidor**, sobre las posiciones que aceptó. Es lo
 que ya decía el §2 —«disparé desde P» lleva la P del cliente—, dicho entero.
 
+Desde el 27-sep-2026 el adorno CHOCA en el aparato de los tres juegos que se andan
+(`escenas/paseo/adorno-que-choca.ts`): cada pieza por la planta de lo que tiene entre el tobillo
+(0,305) y la coronilla de quien anda (`ALTURA_DE_QUIEN_ANDA`, en `escenas/paseo/talla.ts`), medida
+a rodajas finas en su `.glb`; lo que se pisa (puentes, andenes, láminas) y lo que va por encima de
+la cabeza no. El servidor no cambia: su arena es un subconjunto de la del aparato, así que chocar
+de más nunca trae un `corrige`. Al revés, si el servidor pone a alguien dentro de un coche que no
+ve, el aparato le saca ANDANDO, un tic de correr por tic y en recta por la estructura, que es lo
+que el servidor acepta; y el adorno que tapa un brote vivo deja de chocar mientras el brote esté.
+
 Las Lindes sí baja su reparto a `shared/`, porque allí las casas y las murallas SON estructura y
 salen del sorteo del paisaje. De lo menudo, sólo son estructura las piedras, las rocas y los
 tocones que, puestos, pasan de la cintura de quien anda (media persona, 1,27 u), con el cuadrado

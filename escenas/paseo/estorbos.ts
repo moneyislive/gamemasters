@@ -16,6 +16,9 @@
  * desde lo que ya pinta y que el paseo CONSUME, como consume su mundo. Ni choca ni viaja: no
  * cambia por dónde se anda ni lo que ve el servidor, sólo dónde se pone la cámara.
  *
+ * Lo que CHOCA sale de estas mismas rodajas, cortadas más finas y quedándose con la franja del cuerpo
+ * de quien anda: `adorno-que-choca.ts`.
+ *
  * ═══ POR QUÉ CAJAS CON ALTURA, Y POR QUÉ A RODAJAS ═══
  *
  * Con la altura, porque es lo que distingue lo que tapa de lo que no: un banco se queda por
@@ -232,6 +235,7 @@ export function rodajasDeUnaMalla(
   posiciones: ArrayLike<number>,
   indices: ArrayLike<number> | null,
   alto: number = ALTO_DE_UNA_RODAJA,
+  tope: number = TOPE_DE_RODAJAS,
 ): Estorbo[] {
   const vertices = Math.floor(posiciones.length / 3);
   if (vertices === 0) return [];
@@ -243,7 +247,7 @@ export function rodajasDeUnaMalla(
     if (y > ymax) ymax = y;
   }
   if (!Number.isFinite(ymin) || !Number.isFinite(ymax)) return [];
-  const n = Math.max(1, Math.min(TOPE_DE_RODAJAS, Math.ceil((ymax - ymin) / alto)));
+  const n = Math.max(1, Math.min(tope, Math.ceil((ymax - ymin) / alto)));
   const paso = ymax > ymin ? (ymax - ymin) / n : 1;
   const x0 = new Array<number>(n).fill(Infinity);
   const z0 = new Array<number>(n).fill(Infinity);
