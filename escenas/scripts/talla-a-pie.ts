@@ -22,7 +22,8 @@
  *      sigue aceptando la velocidad de la app 1.8.x (`VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR`). La vacuna,
  *      12 u/s con el cuerpo nuevo. Que un aparato viejo andando a su velocidad no reciba correcciones lo
  *      mide `verify:sala-de-botas` por el canal de verdad.
- *   4. LA MARIONETA SE PINTA A ESA TALLA: `mueveAQuienAnda` escala el grupo a `TALLA_A_PIE`, y se ve
+ *   4. AL HOMBRO OCUPA UN TERCIO DE LA PANTALLA: proyectado con la cámara de verdad en cinco formas.
+ *   5. LA MARIONETA SE PINTA A ESA TALLA: `mueveAQuienAnda` escala el grupo a `TALLA_A_PIE`, y se ve
  *      fallar sin la línea.
  */
 import fs from 'node:fs';
@@ -36,6 +37,7 @@ import { RADIO_DE_RECOGER } from '../../shared/mecanicas/hallazgos';
 import { ARMAS, FICHA_DEL_ARMA } from '../../shared/arcade/juegos/riberas-armas';
 import { ESCALA_DE_LA_CASA } from '../../shared/arcade/juegos/lindes-medidas';
 import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
+import { camaraDeHombro, parteDeLaPantallaDeQuienAnda } from '../paseo/camaras';
 import { ALTURA_DE_QUIEN_ANDA, TALLA_A_PIE } from '../paseo/talla';
 import { elCatalogoDelBurgo, elCatalogoDelTablero } from './adorno-en-node';
 
@@ -156,6 +158,56 @@ export async function medirLaTallaAPie(comprobar: Comprobar, paso: (titulo: stri
     'y el servidor acepta lo que corre la app 1.8.x (26,4 u/s), que es más de lo que corre la de hoy',
     VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR >= 1730150 && VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR > VELOCIDAD_CORRIENDO,
     { VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, VELOCIDAD_CORRIENDO },
+  );
+
+  paso('Al hombro, quien anda ocupa un tercio del alto de la pantalla y la calle se ve por delante');
+  /*
+   * PROYECTADO CON LA CÁMARA DE VERDAD: una `PerspectiveCamera` de three con el campo de los tres juegos
+   * (45° vertical), puesta donde la pone `camaraDeHombro` y mirando a donde mira, en las formas de
+   * pantalla de siempre. Se proyectan los pies y la coronilla de quien anda. Entre el 28 % y el 38 % del
+   * alto —un tercio—, dentro del 25-45 % que se pidió, y la coronilla no por encima del centro más de un
+   * pelo: lo de arriba del lienzo es la calle. La vacuna es la cámara de antes (2,6 detrás, 1,5 encima,
+   * mirando a 2,36 por delante y a 0,6 de alto), que daba el 42 % con la cabeza en medio de la calle.
+   */
+  const FORMAS: readonly (readonly [string, number])[] = [
+    ['portátil', 1366 / 700],
+    ['móvil tumbado', 844 / 390],
+    ['móvil de pie', 390 / 844],
+    ['escritorio', 1920 / 1000],
+    ['tableta', 768 / 1024],
+  ];
+  const proyectar = (aspecto: number, pose: ReturnType<typeof camaraDeHombro>): { parte: number; coronilla: number } => {
+    const c = new THREE.PerspectiveCamera(45, aspecto, 0.1, 1000);
+    c.position.set(pose.x, pose.y, pose.z);
+    c.lookAt(pose.miraX, pose.miraY, pose.miraZ);
+    c.updateMatrixWorld(true);
+    const pies = new THREE.Vector3(0, 0, 0).project(c);
+    const cabeza = new THREE.Vector3(0, ALTURA_DE_QUIEN_ANDA, 0).project(c);
+    return { parte: (cabeza.y - pies.y) / 2, coronilla: cabeza.y };
+  };
+  const quien = { x: 0, z: 0, rumbo: 0 };
+  const deHoy = camaraDeHombro(quien);
+  const h = ALTURA_DE_QUIEN_ANDA;
+  const deAntes = { x: 0, y: 1.5 * h, z: 2.6 * h, miraX: 0, miraY: 0.6 * h, miraZ: -h * (6 / 2.543) };
+  const malas: string[] = [];
+  for (const [forma, aspecto] of FORMAS) {
+    const p = proyectar(aspecto, deHoy);
+    if (!(p.parte >= 0.28 && p.parte <= 0.38 && p.coronilla <= 0.05)) malas.push(`${forma}: ${(p.parte * 100).toFixed(1)} %, coronilla en ${p.coronilla.toFixed(3)}`);
+  }
+  const hoy = proyectar(16 / 9, deHoy);
+  const cuenta = parteDeLaPantallaDeQuienAnda(45);
+  console.log(`  al hombro ocupa el ${(hoy.parte * 100).toFixed(1)} % del alto, con la coronilla en ${hoy.coronilla.toFixed(3)} (la cuenta pura: ${(cuenta.parte * 100).toFixed(1)} %)`);
+  comprobar('en las cinco formas de pantalla, quien anda ocupa entre el 28 % y el 38 % del alto, con la calle por encima de su cabeza', malas.length === 0, malas);
+  comprobar(
+    'y `parteDeLaPantallaDeQuienAnda` dice lo mismo que la cámara de three',
+    Math.abs(cuenta.parte - hoy.parte) < 1e-6 && Math.abs(cuenta.coronilla - hoy.coronilla) < 1e-6,
+    { cuenta, hoy },
+  );
+  const antesMedia = proyectar(16 / 9, deAntes);
+  comprobar(
+    `la vacuna: con la cámara de antes ocupaba el ${(antesMedia.parte * 100).toFixed(1)} %, más de lo que se admite`,
+    antesMedia.parte > 0.38,
+    antesMedia,
   );
 
   paso('La marioneta se pinta a la talla a pie, la propia y la de los demás');

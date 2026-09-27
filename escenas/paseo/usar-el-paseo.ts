@@ -338,7 +338,8 @@ export function usarElPaseo(o: OpcionesDelPaseo): ElPaseo {
       atras = acercarElHombro(atrasDelHombro.current, Math.min(cabe, noTapa), dt);
     }
     atrasDelHombro.current = atras;
-    const c = atras === null ? camaraDeOjos(p, suelo) : camaraDeHombro(p, suelo, atras);
+    /* La de hombro mira a donde están los pies (`y`), no a donde se apoya ella: ver `camaraDeHombro`. */
+    const c = atras === null ? camaraDeOjos(p, suelo) : camaraDeHombro(p, suelo, atras, y);
     camera.position.set(c.x, c.y, c.z);
     camera.lookAt(c.miraX, c.miraY, c.miraZ);
   }, -1);

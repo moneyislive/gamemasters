@@ -74,18 +74,55 @@ import { ALTURA_DE_QUIEN_ANDA } from './talla';
 /** A qué altura van los ojos sobre el suelo que se pisa. */
 export const ALTURA_DE_LOS_OJOS = ALTURA_DE_QUIEN_ANDA * 0.92;
 
-/** Cuánto se queda la cámara de hombro por detrás y por encima del suelo que se pisa. */
-export const ATRAS_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 2.6;
-export const SOBRE_EL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 1.5;
+/**
+ * CUÁNTO SE QUEDA LA CÁMARA DE HOMBRO POR DETRÁS Y POR ENCIMA del suelo que se pisa, y hacia dónde mira.
+ *
+ * ═══ UN TERCIO DE LA PANTALLA, Y LA CALLE POR DELANTE ═══
+ *
+ * Con la talla a pie la cámara encogió con la figura (2,6 alturas detrás, 1,5 encima, mirando a 2,36 por
+ * delante y a 0,6 de alto) y el encuadre quedó el de siempre: la figura ocupaba el 42 % del alto del
+ * lienzo con la coronilla en el centro, justo donde está la calle a la que se va. Miguel seguía viéndolos
+ * «grandes», y con razón: en pantalla medían lo mismo. Ahora la cámara va a 3,6 alturas detrás y 1,6
+ * encima, mirando a un punto a 4 alturas por delante y a media altura: la figura ocupa un TERCIO del
+ * alto (31 %, `parteDeLaPantallaDeQuienAnda`) con la coronilla un pelo por debajo del centro, y la mitad
+ * de arriba del lienzo es lo que tiene delante. El campo vertical de los tres juegos es 45°, así que en
+ * portátil, tumbado y de pie la figura ocupa lo mismo de alto; `verify:paseo` lo proyecta.
+ *
+ * Lo que la acerca ante un muro o el adorno (`hastaDondeCabeElHombro`, `hastaDondeNoTapa`,
+ * `acercarElHombro`) no cambia: parte de más lejos y se acerca igual, sin saltos.
+ */
+export const ATRAS_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 3.6;
+export const SOBRE_EL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 1.6;
+/** A qué altura sobre el suelo está el punto al que mira la cámara de hombro: media figura. */
+export const MIRA_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 0.5;
 
 /**
  * Hacia dónde miran, por delante: la de ojos a cuatro alturas —casi recto, un pelo hacia abajo— y la
- * de hombro a dos y media, que es lo que la inclina hacia la nuca. En alturas de quien anda por lo
- * mismo que todo lo demás: con unidades fijas, al encoger la figura la cámara de hombro miraría más
- * lejos y más plana y la dejaría en el borde de abajo del encuadre.
+ * de hombro a cuatro también (ver arriba). En alturas de quien anda por lo mismo que todo lo demás.
  */
 export const DELANTE_DE_LOS_OJOS = ALTURA_DE_QUIEN_ANDA * (10 / 2.543);
-export const DELANTE_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * (6 / 2.543);
+export const DELANTE_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 4;
+
+/**
+ * CUÁNTO DEL ALTO DEL LIENZO OCUPA QUIEN ANDA con la cámara de hombro, y dónde queda su coronilla (en
+ * coordenadas de pantalla: 0 el centro, 1 el borde de arriba, −1 el de abajo). Proyección de verdad de
+ * la cámara de `camaraDeHombro`, con el campo VERTICAL en grados —el que se le da a la cámara de r3f—;
+ * como el campo es vertical, no depende de la forma de la pantalla. Aritmética pura, para medirla en Node.
+ */
+export function parteDeLaPantallaDeQuienAnda(
+  campoGrados: number,
+  atras: number = ATRAS_DEL_HOMBRO,
+  sobre: number = SOBRE_EL_HOMBRO,
+  delante: number = DELANTE_DEL_HOMBRO,
+  mira: number = MIRA_DEL_HOMBRO,
+  altura: number = ALTURA_DE_QUIEN_ANDA,
+): { readonly parte: number; readonly coronilla: number } {
+  const medio = Math.tan(((campoGrados * Math.PI) / 180) / 2);
+  const inclinacion = Math.atan2(sobre - mira, atras + delante);
+  /* Cuánto por debajo del eje de la cámara cae un punto de la figura a la altura `y`, en tangente. */
+  const bajo = (y: number): number => Math.tan(Math.atan2(sobre - y, atras) - inclinacion);
+  return { parte: (bajo(0) - bajo(altura)) / (2 * medio), coronilla: -bajo(altura) / medio };
+}
 
 /** Dónde va la cámara y hacia dónde mira. */
 export interface PoseDeCamara {
@@ -143,16 +180,20 @@ export function camaraDeOjos(quien: QuienSeMira, suelo = 0): PoseDeCamara {
 }
 
 /**
- * La cámara de hombro: por detrás y por encima, mirando a la nuca. `suelo` es la altura que pisa y
- * `atras` cuánto se queda detrás —lo que dé `acercarElHombro`, o la distancia de siempre—.
+ * La cámara de hombro: por detrás y por encima, mirando a la nuca. `suelo` es la altura en la que se
+ * apoya la cámara, `atras` cuánto se queda detrás —lo que dé `acercarElHombro`, o la distancia de
+ * siempre— y `pies` dónde se pintan los pies, que en Las Lindes no son lo mismo: la cámara no baja del
+ * prado (`alturaDeLaCamara`) y la senda está hundida 1,20, casi una figura entera desde la talla a pie.
+ * Por eso se MIRA a la altura de los pies y no a la de la cámara: mirando a la de la cámara, andando por
+ * la senda la figura se salía por abajo del encuadre.
  */
-export function camaraDeHombro(quien: QuienSeMira, suelo = 0, atras = ATRAS_DEL_HOMBRO): PoseDeCamara {
+export function camaraDeHombro(quien: QuienSeMira, suelo = 0, atras = ATRAS_DEL_HOMBRO, pies = suelo): PoseDeCamara {
   return {
     x: quien.x - Math.sin(quien.rumbo) * atras,
     y: suelo + SOBRE_EL_HOMBRO,
     z: quien.z + Math.cos(quien.rumbo) * atras,
     miraX: quien.x + Math.sin(quien.rumbo) * DELANTE_DEL_HOMBRO,
-    miraY: suelo + ALTURA_DE_QUIEN_ANDA * 0.6,
+    miraY: pies + MIRA_DEL_HOMBRO,
     miraZ: quien.z - Math.cos(quien.rumbo) * DELANTE_DEL_HOMBRO,
   };
 }
