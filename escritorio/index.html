@@ -3,14 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <!--
-      NADA DE `width=device-width` AQUÍ, y no es un descuido copiado a medias del
-      taller: esto es un cliente de PC. La app de móvil ya existe en /jugar y se
-      queda como está; lo que falta es una pantalla pensada para un monitor y un
-      ratón, y para eso la anchura de referencia es la de la ventana, no la de un
-      teléfono. Lo que sí hay es `initial-scale`, para que un portátil con la
-      pantalla escalada no salga con todo diminuto.
+      `width=device-width`, y `viewport-fit=cover` para pintar hasta los bordes.
+
+      Hasta el 27-sep-2026 aquí ponía `width=1024`: la Sala era «el cliente de PC» y el
+      móvil iba por /jugar. Pero la Sala se abre desde el teléfono —un enlace pasado por
+      un chat lleva aquí—, y con 1024 el teléfono la pintaba como un monitor y la encogía
+      a un tercio: la palanca de 128 px pensada para el pulgar se quedaba en 45, y los
+      textos no se leían. Miguel lo vio jugando y pidió que se juegue bien en el móvil
+      también desde /sala. Cada pantalla reparte su sitio con el ancho de verdad.
     -->
-    <meta name="viewport" content="width=1024, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Sala de Arcade</title>
     <meta name="theme-color" content="#06110f" />
   </head>
