@@ -61,6 +61,12 @@ export interface PropsDelAventureroDelBurgo {
   /** La biblioteca de clips. Vacía hasta que llega: entonces no se enseña. */
   readonly biblioteca: readonly THREE.AnimationClip[];
   readonly anillo?: AnilloEn3D;
+  /**
+   * A qué talla se pinta, sobre la de serie. 1 desde la mesa; a pie, `TALLA_A_PIE` (`paseo/talla.ts`):
+   * el aventurero del raíl anda el anillo que también anda quien baja a la calle, y a su lado tiene
+   * que medir lo mismo que él.
+   */
+  readonly talla?: number;
 }
 
 /** El disco bajo los pies, como el del Muelle: la escena no proyecta sombras en ningún cliente. Lo pinta `Burgo.tsx`. */
@@ -69,7 +75,7 @@ export const RADIO_DEL_DISCO_DEL_AVENTURERO = 0.75;
 const PESO_DEL_SALUDO = 0.6;
 
 export function Aventurero(props: PropsDelAventureroDelBurgo): JSX.Element {
-  const { estado, cargado, biblioteca, anillo = ANILLO_DEL_BURGO } = props;
+  const { estado, cargado, biblioteca, anillo = ANILLO_DEL_BURGO, talla = 1 } = props;
 
   const marioneta = usarMarioneta(cargado, biblioteca);
 
@@ -86,7 +92,7 @@ export function Aventurero(props: PropsDelAventureroDelBurgo): JSX.Element {
     g.visible = visible;
     g.position.set(p.x, 0, p.z);
     g.rotation.set(0, p.rumbo, 0);
-    const escala = Math.max(0.001, p.escala);
+    const escala = Math.max(0.001, p.escala) * talla;
     g.scale.set(escala, escala, escala);
     if (marioneta === null) return;
 

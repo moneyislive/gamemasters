@@ -67,6 +67,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { WebSocket } from 'ws';
 import {
+  ALCANCE_DEL_GOLPE,
   BOTIN_CADA_PAREJA_MS,
   CAIDO,
   CAIDO_MS,
@@ -86,9 +87,20 @@ import {
   VIDA_ENTERA,
 } from '../../shared/mecanicas/canal-de-botas';
 import type { MensajeDelServidor } from '../../shared/mecanicas/canal-de-botas';
-import { pasoDelTic, RADIO_DEL_PASEANTE, rumboDeRadianes, TICS_POR_SEGUNDO } from '../../shared/mecanicas/andar';
-import { deNumero, UNO } from '../../shared/mecanicas/fijo';
-import { arenaDe, seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
+import {
+  COSENO,
+  DT_DEL_TIC,
+  pasoDelTic,
+  RADIO_DEL_PASEANTE,
+  rumboDeRadianes,
+  SENO,
+  TICS_POR_SEGUNDO,
+  VELOCIDAD_CORRIENDO,
+  VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR,
+} from '../../shared/mecanicas/andar';
+import { deNumero, por, UNO } from '../../shared/mecanicas/fijo';
+import { arenaDe, seAndaEnRecta, sePuedeEstar, unPaso } from '../../shared/mecanicas/mundo';
+import { TALLA_A_PIE } from '../../shared/mecanicas/talla';
 import type { Arena, Cuerpo, MundoDeclarado } from '../../shared/mecanicas/mundo';
 /* Sólo el tipo: `mesas.ts` se carga a mano más abajo, cuando ya está puesta su carpeta. */
 import type { SalidaDeLaPlataforma } from '../src/arcade/mesas';
@@ -105,6 +117,7 @@ import {
 import {
   ATASCO_BYTES,
   CanalDeBotas,
+  HOLGURA_DEL_PRESUPUESTO,
   LEJOS_AL_RENACER,
   REBOBINADO_MS,
   RECORDAR_LA_CORRECCION_MS,
@@ -466,16 +479,25 @@ function vidasEn(enchufe: EnchufeDeMentira): Map<string, readonly [number, numbe
 const U = UNO;
 
 /*
+ * LAS DISTANCIAS DE LA REFRIEGA VAN CON LA TALLA A PIE (`shared/mecanicas/talla.ts`). Estas pruebas se
+ * escribieron para un cuerpo de 2,543, con el golpe a 2,5 y se nacía a 1,6 de otro; desde el 27-sep-2026
+ * quien anda mide la mitad, y el golpe, la recogida y la separación al nacer también. Las distancias
+ * de los sitios de prueba van multiplicadas por `T`, así que la geometría es la misma encogida; el
+ * radio con el que se choca (0,4) no encoge, y donde un muro queda cerca de alguien se ha medido a mano.
+ */
+const T = TALLA_A_PIE;
+
+/*
  * EL RUEDO, para la refriega: nueve por nueve casillas de 16 unidades —de −72 a 72—, sin nada en
  * medio salvo lo que ponga cada prueba, y cinco sitios de nacer. El primero en el centro, mirando al
- * norte; el segundo DOS unidades al norte del primero, mirando al sur —dentro del alcance y del cono
- * de quien nace en el primero—; y tres lejos, a sesenta.
+ * norte; el segundo UNA unidad al norte del primero (dos a la talla de antes), mirando al sur —dentro
+ * del alcance y del cono de quien nace en el primero—; y tres lejos, a sesenta.
  */
 const CASILLAS_DEL_RUEDO: { x: number; y: number }[] = [];
 for (let x = -4; x <= 4; x++) for (let y = -4; y <= 4; y++) CASILLAS_DEL_RUEDO.push({ x, y });
 const NACE_EN_EL_RUEDO = [
   { x: 0, z: 0, rumbo: 0 },
-  { x: 0, z: -2, rumbo: Math.PI },
+  { x: 0, z: -2 * T, rumbo: Math.PI },
   { x: 60, z: 0, rumbo: 0 },
   { x: -60, z: 0, rumbo: 0 },
   { x: 0, z: 60, rumbo: 0 },
@@ -487,20 +509,20 @@ function ruedo(cuerpos: readonly Cuerpo[] = []): MundoDeclarado {
 
 /*
  * EL CORRO, para los topes del botín: dos que golpean —en (0, 0) y en (20, 0)— y, alrededor de cada
- * uno, cuatro que no bajan nunca, a 2,4 unidades al norte, al este, al sur y al oeste. Mirando a uno,
+ * uno, cuatro que no bajan nunca, a 1,2 unidades (2,4 a la talla de antes) al norte, al este, al sur y al oeste. Mirando a uno,
  * los de al lado quedan a noventa grados: fuera del cono. Cada asiento nace en su sitio.
  */
 const EN_EL_CORRO: readonly (readonly [string, number, number])[] = [
   ['c-a', 0, 0],
   ['c-z', 20, 0],
-  ['a-n', 0, -2.4],
-  ['a-e', 2.4, 0],
-  ['a-s', 0, 2.4],
-  ['a-o', -2.4, 0],
-  ['z-n', 20, -2.4],
-  ['z-e', 22.4, 0],
-  ['z-s', 20, 2.4],
-  ['z-o', 17.6, 0],
+  ['a-n', 0, -2.4 * T],
+  ['a-e', 2.4 * T, 0],
+  ['a-s', 0, 2.4 * T],
+  ['a-o', -2.4 * T, 0],
+  ['z-n', 20, -2.4 * T],
+  ['z-e', 20 + 2.4 * T, 0],
+  ['z-s', 20, 2.4 * T],
+  ['z-o', 20 - 2.4 * T, 0],
 ];
 function corro(): MundoDeclarado {
   return { lado: 16, pisables: CASILLAS_DEL_RUEDO, vados: [], cuerpos: [], nace: EN_EL_CORRO.map(([, x, z]) => ({ x, z, rumbo: 0 })) };
@@ -1536,7 +1558,7 @@ paso('`lanza` y `da` a toda la sala; la recarga cuenta desde el último golpe AC
   golpear(a, 0);
   const primero = b.enchufe.ultimo('da');
   comprobar(
-    'A golpea al norte y le da a B, que nace a dos unidades delante: `da` con la vida que le queda',
+    'A golpea al norte y le da a B, que nace a una unidad delante: `da` con la vida que le queda',
     primero?.de === 'r-uno' && primero.a === 'r-dos' && primero.vida === VIDA_ENTERA - 1,
     b.enchufe.textos.slice(-3),
   );
@@ -1573,10 +1595,11 @@ paso('`lanza` y `da` a toda la sala; la recarga cuenta desde el último golpe AC
 // 18 · A QUIÉN LE DA: ALCANCE, CONO, DETRÁS, MURO, EL MÁS CERCANO
 // ---------------------------------------------------------------------------
 
-paso('A quién le da: a dos unidades y media como mucho, dentro del cono, no por detrás, sin muro en medio, y al más cercano');
+paso(`A quién le da: a ${String(ALCANCE_DEL_GOLPE)} unidades como mucho, dentro del cono, no por detrás, sin muro en medio, y al más cercano`);
 
 {
-  const MURO: Cuerpo = { x0: 20, z0: -1.1, x1: 30, z1: -0.9 };
+  /* El muro, entre A (z = 0) y B (z = −1): a 0,45 de los dos, más que su radio (0,4), y en medio del golpe. */
+  const MURO: Cuerpo = { x0: 20, z0: -0.55, x1: 30, z1: -0.45 };
   const { canal, reloj } = canalNuevo();
   const m = mesaNueva({ mundo: ruedo([MURO]), asientos: ASIENTOS_DEL_RUEDO });
   const a = await entrar(canal, m.codigo, m.llave('r-uno'));
@@ -1589,20 +1612,22 @@ paso('A quién le da: a dos unidades y media como mucho, dentro del cono, no por
     golpear(a, r);
     return cuantos(b.enchufe, 'da') > antes;
   };
-  comprobar('a 2,6 unidades, delante: no le da', !(await leDa(0, -2.6, 0)));
-  comprobar('a 2,4, delante: le da', await leDa(0, -2.4, 0));
-  const a50 = [2 * Math.sin((50 * Math.PI) / 180), -2 * Math.cos((50 * Math.PI) / 180)] as const;
-  const a40 = [2 * Math.sin((40 * Math.PI) / 180), -2 * Math.cos((40 * Math.PI) / 180)] as const;
-  comprobar('a dos unidades pero a 50 grados de la mirada, fuera del cono: no le da', !(await leDa(a50[0], a50[1], 0)));
+  const pasado = ALCANCE_DEL_GOLPE + 0.1;
+  const dentro = ALCANCE_DEL_GOLPE - 0.1;
+  comprobar(`a ${pasado.toFixed(2)} unidades, delante: no le da`, !(await leDa(0, -pasado, 0)));
+  comprobar(`a ${dentro.toFixed(2)}, delante: le da`, await leDa(0, -dentro, 0));
+  const a50 = [2 * T * Math.sin((50 * Math.PI) / 180), -2 * T * Math.cos((50 * Math.PI) / 180)] as const;
+  const a40 = [2 * T * Math.sin((40 * Math.PI) / 180), -2 * T * Math.cos((40 * Math.PI) / 180)] as const;
+  comprobar('a una unidad pero a 50 grados de la mirada, fuera del cono: no le da', !(await leDa(a50[0], a50[1], 0)));
   comprobar('a 40 grados, dentro: le da', await leDa(a40[0], a40[1], 0));
-  comprobar('a dos unidades, a la espalda: no le da', !(await leDa(0, 2, 0)));
+  comprobar('a una unidad, a la espalda: no le da', !(await leDa(0, 2 * T, 0)));
   await llevar(reloj, a, deNumero(25), 0);
   comprobar(
-    'con un muro fino en medio, a dos unidades, delante y en el cono: no le da',
-    sePuedeEstar(arenaDe(ruedo([MURO])), deNumero(25), deNumero(-2), RADIO_DEL_PASEANTE) && !(await leDa(25, -2, 0)),
+    'con un muro fino en medio, a una unidad, delante y en el cono: no le da',
+    sePuedeEstar(arenaDe(ruedo([MURO])), deNumero(25), deNumero(-2 * T), RADIO_DEL_PASEANTE) && !(await leDa(25, -2 * T, 0)),
   );
   await llevar(reloj, a, deNumero(35), 0);
-  comprobar('y lo mismo diez unidades más allá, donde el muro ya no está: le da', await leDa(35, -2, 0));
+  comprobar('y lo mismo diez unidades más allá, donde el muro ya no está: le da', await leDa(35, -2 * T, 0));
   canal.apagar();
 }
 
@@ -1611,24 +1636,25 @@ paso('A quién le da: a dos unidades y media como mucho, dentro del cono, no por
    * EL MÁS CERCANO, UNO SOLO; y si el más cercano tiene un muro delante, el siguiente. En el ruedo con
    * un muro corto al oeste, a cuarenta unidades del centro.
    */
-  const MURITO: Cuerpo = { x0: -39.8, z0: -1.1, x1: -39, z1: -1 };
+  /* Medidos a mano contra el radio (0,4): C a 0,45 del murito, B a 0,45 de su esquina, y los dos a menos del alcance. */
+  const MURITO: Cuerpo = { x0: -39.9, z0: -0.55, x1: -39.5, z1: -0.5 };
   const { canal, reloj } = canalNuevo();
   const m = mesaNueva({ mundo: ruedo([MURITO]), asientos: ASIENTOS_DEL_RUEDO });
   const a = await entrar(canal, m.codigo, m.llave('r-uno'));
   const b = await entrar(canal, m.codigo, m.llave('r-dos'));
   const c = await entrar(canal, m.codigo, m.llave('r-tres'));
-  await llevar(reloj, c, deNumero(0.3), deNumero(-1.5));
+  await llevar(reloj, c, deNumero(0.3 * T), deNumero(-1.5 * T));
   await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
   golpear(a, 0);
   const das = a.enchufe.de('da');
   comprobar(
-    'con B a dos unidades y C a 1,5, los dos delante: un solo `da`, y para C, el más cercano',
+    'con B a una unidad y C a 0,75, los dos delante: un solo `da`, y para C, el más cercano',
     das.length === 1 && das[0]?.a === 'r-tres',
     das,
   );
   await llevar(reloj, a, deNumero(-40), 0);
-  await llevar(reloj, c, deNumero(-39.4), deNumero(-1.8));
-  await llevar(reloj, b, deNumero(-40.6), deNumero(-2.2));
+  await llevar(reloj, c, deNumero(-39.7), deNumero(-1));
+  await llevar(reloj, b, deNumero(-40.35), deNumero(-1.1));
   await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
   golpear(a, 0);
   const otro = a.enchufe.ultimo('da');
@@ -1657,22 +1683,22 @@ paso(`El rebobinado: se le ve donde lo veía quien golpeó, hasta ${String(REBOB
   const a = await entrar(canal, m.codigo, m.llave('r-uno'));
   const b = await entrar(canal, m.codigo, m.llave('r-dos'));
   await reloj.avanzar(1000);
-  /* B se va del alcance en dos pasos de 1,5 unidades, y A golpea 230 ms después del primero. */
-  andar(b, 0, deNumero(-3.5));
+  /* B se va del alcance en dos pasos de 0,75 unidades, y A golpea 230 ms después del primero. */
+  andar(b, 0, deNumero(-3.5 * T));
   await reloj.avanzar(50);
-  andar(b, 0, deNumero(-5));
+  andar(b, 0, deNumero(-5 * T));
   await reloj.avanzar(180);
   golpear(a, 0);
   comprobar(
-    'B se fue hace 230 ms y ya está a cinco unidades, pero A lo veía delante: le da',
-    cuantos(b.enchufe, 'da') === 1 && b.x === 0 && b.z === deNumero(-5),
+    'B se fue hace 230 ms y ya está a dos unidades y media, pero A lo veía delante: le da',
+    cuantos(b.enchufe, 'da') === 1 && b.x === 0 && b.z === deNumero(-5 * T),
     b.enchufe.textos.slice(-2),
   );
-  await llevar(reloj, b, 0, deNumero(-2));
+  await llevar(reloj, b, 0, deNumero(-2 * T));
   await reloj.avanzar(1000);
-  andar(b, 0, deNumero(-3.5));
+  andar(b, 0, deNumero(-3.5 * T));
   await reloj.avanzar(50);
-  andar(b, 0, deNumero(-5));
+  andar(b, 0, deNumero(-5 * T));
   await reloj.avanzar(260);
   golpear(a, 0);
   comprobar(
@@ -1703,8 +1729,8 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
   );
   const b = await entrar(canal, m.codigo, m.llave('r-dos'));
   const d = await entrar(canal, m.codigo, m.llave('r-cuatro'));
-  /* D se aparta dos unidades al norte de su sitio de nacer (−60, 0), y mira al sur, hacia él. */
-  await llevar(reloj, d, deNumero(-60), deNumero(-2));
+  /* D se aparta una unidad al norte de su sitio de nacer (−60, 0), y mira al sur, hacia él. */
+  await llevar(reloj, d, deNumero(-60), deNumero(-2 * T));
   await reloj.avanzar(RECARGA_DEL_GOLPE_MS);
   const pedidos = BOTINES_PEDIDOS.length;
   golpear(a, 0);
@@ -1742,7 +1768,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
       cuantos(b.enchufe, 'corrige') === 0 &&
       tumbado !== undefined &&
       tumbado[1] === 0 &&
-      tumbado[2] === deNumero(-2) &&
+      tumbado[2] === deNumero(-2 * T) &&
       tumbado[4] === 0,
     tumbado,
   );
@@ -1773,7 +1799,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
     d.enchufe.textos.slice(-2),
   );
   comprobar(
-    'y lejos de quien lo tumbó: su sitio está a dos unidades de A, el siguiente lo ocupa quien no ha bajado, y el de después, libre desde que D se apartó, está a sesenta',
+    'y lejos de quien lo tumbó: su sitio está a una unidad de A, el siguiente lo ocupa quien no ha bajado, y el de después, libre desde que D se apartó, está a sesenta',
     renace?.x === deNumero(-60) && renace.z === 0,
     renace,
   );
@@ -1795,7 +1821,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
   await reloj.avanzar(REBOBINADO_MS);
   golpear(d, 128);
   comprobar(
-    'recién nacido es intocable: pasado el rebobinado —que ya le ve donde renació— D, a dos unidades y mirándole, no le da',
+    'recién nacido es intocable: pasado el rebobinado —que ya le ve donde renació— D, a una unidad y mirándole, no le da',
     cuantos(b.enchufe, 'da') === 3 && cuantos(d.enchufe, 'lanza') > 0,
     b.enchufe.textos.slice(-2),
   );
@@ -1821,7 +1847,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
 
   /* Y LA PAREJA AL REVÉS es otra: B va hasta A y lo tumba, y hay botín. */
   const deVuelta = BOTINES_PEDIDOS.length;
-  await llevar(reloj, b, 0, deNumero(-2));
+  await llevar(reloj, b, 0, deNumero(-2 * T));
   await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
   for (let i = 0; i < 3; i++) {
     golpear(b, 128);
@@ -1866,7 +1892,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
   const a = await entrar(canal, m.codigo, m.llave('r-uno'));
   const v = await entrar(canal, m.codigo, m.llave('r-tres'));
   await llevar(reloj, a, deNumero(5), 0);
-  await llevar(reloj, v, deNumero(5), deNumero(-2));
+  await llevar(reloj, v, deNumero(5), deNumero(-2 * T));
   await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
   for (let i = 0; i < 3; i++) {
     golpear(a, 0);
@@ -1885,7 +1911,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
 {
   /*
    * EL MÁS LEJANO: si ningún sitio libre está lejos, el libre más lejano de quien lo tumbó. En el
-   * prado —tres sitios a seis unidades— con A en (0, 3) y B cayendo en (0, 1): el suyo, (0, 6), está a
+   * prado —tres sitios a seis unidades— con A en (0, 3) y B cayendo en (0, 2): el suyo, (0, 6), está a
    * 3 de A; el de A, (0, 0), a 3; y (−6, 0) a 6,7. Ni el suyo ni el primero de la lista.
    */
   const { canal, reloj } = canalNuevo();
@@ -1893,7 +1919,7 @@ paso('Caer y renacer: tres golpes y `cae`; el caído ni anda, ni golpea, ni reci
   const a = await entrar(canal, m.codigo, m.llave('a-uno'));
   const b = await entrar(canal, m.codigo, m.llave('a-dos'));
   await llevar(reloj, a, 0, deNumero(3));
-  await llevar(reloj, b, 0, deNumero(1));
+  await llevar(reloj, b, 0, deNumero(3 - 2 * T));
   await reloj.avanzar(RECARGA_DEL_GOLPE_MS + REBOBINADO_MS);
   for (let i = 0; i < 3; i++) {
     golpear(a, 0);
@@ -1923,7 +1949,7 @@ paso('Nadie es inmune por no bajar: a quien nunca abrió su canal, y a quien lo 
   const quieto = enLaFoto(a.enchufe, 'r-dos');
   comprobar(
     'quien no ha bajado nunca está en la sala: en la foto, de pie en su sitio de nacer, y en `vidas`',
-    quieto !== undefined && quieto[1] === 0 && quieto[2] === deNumero(-2) && quieto[4] === 0 && vidasEn(a.enchufe).has('r-dos'),
+    quieto !== undefined && quieto[1] === 0 && quieto[2] === deNumero(-2 * T) && quieto[4] === 0 && vidasEn(a.enchufe).has('r-dos'),
     quieto,
   );
   const pedidos = BOTINES_PEDIDOS.length;
@@ -1948,7 +1974,7 @@ paso('Nadie es inmune por no bajar: a quien nunca abrió su canal, y a quien lo 
   const renace = a.enchufe.ultimo('renace');
   comprobar(
     'y cuando por fin baja, aparece donde renació y no en su sitio de nacer',
-    renace !== undefined && baja.x === renace.x && baja.z === renace.z && baja.z !== deNumero(-2),
+    renace !== undefined && baja.x === renace.x && baja.z === renace.z && baja.z !== deNumero(-2 * T),
     [baja.x / U, baja.z / U],
   );
   canal.apagar();
@@ -2228,7 +2254,24 @@ function sorteo(semilla: number): () => number {
   };
 }
 
-async function pasearPorElCanal(nombre: string, arcade: string, mundo: MundoDeclarado, pasos: number, semilla: number): Promise<void> {
+/**
+ * EL PASO DE LA APP 1.8.x, anterior a la talla a pie: el mismo `unPaso` que da `pasoDelTic`, a 12 u/s
+ * andando y a 26,4 corriendo, que son las velocidades que esa app lleva dentro. El servidor valida con
+ * `VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR` precisamente para que este paso no se corrija nunca.
+ */
+function pasoDeLaApp18(arena: Arena, desde: { x: number; z: number }, rumbo: number, marcha: 1 | 2): { x: number; z: number } {
+  const v = marcha === 2 ? VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR : 786432;
+  return unPaso(arena, desde, por(v, SENO[rumbo] as number), -por(v, COSENO[rumbo] as number), DT_DEL_TIC, RADIO_DEL_PASEANTE);
+}
+
+async function pasearPorElCanal(
+  nombre: string,
+  arcade: string,
+  mundo: MundoDeclarado,
+  pasos: number,
+  semilla: number,
+  app: 'nueva' | 'vieja' = 'nueva',
+): Promise<void> {
   const { canal, reloj } = canalNuevo();
   const arena = arenaDe(mundo);
   const m = mesaNueva({ arcade, mundo, asientos: ['a-uno', 'a-dos', 'a-tres', 'a-cuatro', 'a-cinco'] });
@@ -2239,6 +2282,9 @@ async function pasearPorElCanal(nombre: string, arcade: string, mundo: MundoDecl
   let dados = 0;
   let conMovimiento = 0;
   let laRectaSola = 0;
+  /* Los pasos más largos que lo que un tic de correr de HOY da de sí, con la holgura: los que un techo nuevo corregiría. */
+  let masQueLaVelocidadNueva = 0;
+  const unTicNuevo = por(VELOCIDAD_CORRIENDO, DT_DEL_TIC) * HOLGURA_DEL_PRESUPUESTO;
   for (let t = 0; t < pasos; t++) {
     await reloj.avanzar(50);
     for (let i = 0; i < gente.length; i++) {
@@ -2246,11 +2292,12 @@ async function pasearPorElCanal(nombre: string, arcade: string, mundo: MundoDecl
       if (azar() < 0.08) rumbos[i] = Math.floor(azar() * 256);
       const marcha = azar() < 0.6 ? 2 : 1;
       const desde = { x: q.x, z: q.z };
-      const hasta = pasoDelTic(arena, desde, rumbos[i] as number, marcha);
+      const hasta = app === 'vieja' ? pasoDeLaApp18(arena, desde, rumbos[i] as number, marcha) : pasoDelTic(arena, desde, rumbos[i] as number, marcha);
       if (hasta.x === desde.x && hasta.z === desde.z) rumbos[i] = Math.floor(azar() * 256);
       else {
         conMovimiento++;
         if (!seAndaEnRecta(arena, desde, hasta, RADIO_DEL_PASEANTE)) laRectaSola++;
+        if (Math.hypot(hasta.x - desde.x, hasta.z - desde.z) > unTicNuevo) masQueLaVelocidadNueva++;
       }
       andar(q, hasta.x, hasta.z, marcha);
       dados++;
@@ -2264,9 +2311,29 @@ async function pasearPorElCanal(nombre: string, arcade: string, mundo: MundoDecl
   );
   comprobar(`${nombre}: se han dado de verdad los pasos (suelo)`, conMovimiento >= pasos * 5 * 0.9, { conMovimiento });
   comprobar(`${nombre}: ningún paso legal se corrige`, correcciones === 0, d.correcciones);
+  /*
+   * LA VACUNA DEL APARATO VIEJO: sus pasos corriendo son más largos que lo que un tic de correr de hoy da
+   * de sí con la holgura. Un servidor que midiera con `VELOCIDAD_CORRIENDO` —la del aparato nuevo— le
+   * corregiría todos esos, uno por tic; es `VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR` lo que se lo evita. Y el
+   * nuevo no da ninguno: cabe en el techo nuevo, y de sobra en el que hay.
+   */
   comprobar(
-    `${nombre}: y el paseo pasa por esquinas —la recta sola habría corregido alguno—, o esto no probaría la escuadra`,
-    laRectaSola > 0 && d.porEscuadra === laRectaSola,
+    app === 'vieja'
+      ? `${nombre}: la vacuna: cientos de sus pasos pasan de lo que corre el aparato de hoy, y con ese techo se corregirían`
+      : `${nombre}: y ninguno de sus pasos pasa de lo que corre el aparato de hoy`,
+    app === 'vieja' ? masQueLaVelocidadNueva > 500 : masQueLaVelocidadNueva === 0,
+    { masQueLaVelocidadNueva },
+  );
+  /*
+   * Las esquinas se cortan con pasos largos: con los de la app 1.8.x (1,32 corriendo) pasa en cada
+   * paseo; con los de hoy, la mitad, casi nunca. Así que la escuadra se exige ver en el paseo viejo, y en
+   * el nuevo sólo que cada esquina que la recta habría corregido la acepte la escuadra.
+   */
+  comprobar(
+    app === 'vieja'
+      ? `${nombre}: y el paseo pasa por esquinas —la recta sola habría corregido alguno—, o esto no probaría la escuadra`
+      : `${nombre}: y si pasa por alguna esquina, la acepta la escuadra`,
+    (app === 'nueva' || laRectaSola > 0) && d.porEscuadra === laRectaSola,
     { laRectaSola, porEscuadra: d.porEscuadra },
   );
   comprobar(`${nombre}: nadie se ha cerrado`, gente.every((q) => q.enchufe.cierre === null), gente.map((q) => q.enchufe.cierre));
@@ -2291,9 +2358,16 @@ async function pasearPorElCanal(nombre: string, arcade: string, mundo: MundoDecl
   const lindes = mundoDeLaMesa('lindes', vista, 'LIN01');
   comprobar('el mundo de una Lindes llena se deriva', lindes !== null && lindes.cuerpos.length > 500, lindes?.cuerpos.length);
   if (lindes !== null) await pasearPorElCanal('Las Lindes llenas', 'lindes', lindes, 1200, 3);
+  /*
+   * Y UN APARATO VIEJO, A LA VELOCIDAD VIEJA, NO RECIBE CORRECCIONES. La app 1.8.x anda al doble que la
+   * de hoy (`shared/mecanicas/andar.ts`); si el servidor validara con la velocidad nueva, cada paso suyo
+   * corriendo sería «correr de más»; la vacuna cuenta cuántos de sus pasos pasan de ese techo.
+   */
+  if (lindes !== null) await pasearPorElCanal('Las Lindes llenas, con la app 1.8.x', 'lindes', lindes, 1200, 3, 'vieja');
   const burgo = mundoDeLaMesa('burgo', null, 'BURG1');
   comprobar('el mundo del Burgo se deriva', burgo !== null && burgo.cuerpos.length > 500, burgo?.cuerpos.length);
   if (burgo !== null) await pasearPorElCanal('El Burgo', 'burgo', burgo, 1200, 5);
+  if (burgo !== null) await pasearPorElCanal('El Burgo, con la app 1.8.x', 'burgo', burgo, 1200, 5, 'vieja');
 }
 
 // ---------------------------------------------------------------------------
@@ -2707,9 +2781,9 @@ async function hasta(que: () => boolean, ms = 3000): Promise<boolean> {
     const pa = sitioDe(ana);
     let pb = sitioDe(otra);
     let n = 0;
-    for (let i = 0; i < 40 && Math.hypot(pb.x - pa.x, pb.z - pa.z) > deNumero(2); i++) {
+    for (let i = 0; i < 80 && Math.hypot(pb.x - pa.x, pb.z - pa.z) > deNumero(2 * T); i++) {
       const d = Math.hypot(pa.x - pb.x, pa.z - pb.z);
-      const tramo = Math.min(deNumero(0.5), d - deNumero(1.8));
+      const tramo = Math.min(deNumero(0.5), d - deNumero(1.8 * T));
       pb = { x: pb.x + Math.round(((pa.x - pb.x) / d) * tramo), z: pb.z + Math.round(((pa.z - pb.z) / d) * tramo) };
       n++;
       otra.enviar(JSON.stringify({ t: 'aqui', n, x: pb.x, z: pb.z, r: 0, m: 1 }));

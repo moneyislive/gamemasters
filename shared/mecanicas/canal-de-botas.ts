@@ -33,6 +33,8 @@
  * de red ni de reloj: esto es contrato y lo usan los dos.
  */
 
+import { TALLA_A_PIE } from './talla';
+
 /** La versión del protocolo. Se sube si cambia la forma de un mensaje. */
 export const VERSION_DEL_CANAL = 1;
 
@@ -225,8 +227,14 @@ export type MensajeDelServidor = Dentro | Foto | Corrige | Fuera | Lanza | Da | 
 /** Cuántos golpes aguanta cada uno. */
 export const VIDA_ENTERA = 3;
 
-/** Hasta dónde llega un golpe, en unidades del mundo: poco más que un brazo y lo que se lanza. */
-export const ALCANCE_DEL_GOLPE = 2.5;
+/**
+ * Hasta dónde llega un golpe, en unidades del mundo: poco más que un brazo y lo que se lanza.
+ *
+ * Eran 2,5 con un cuerpo de 2,543; desde que quien anda mide la mitad (`TALLA_A_PIE`, `talla.ts`)
+ * es la mitad, 1,25: con 2,5 un puñetazo alcanzaba a dos cuerpos de distancia. Lo arbitra el
+ * servidor, así que un aparato viejo que pinta cuerpos grandes pega con el alcance nuevo igual.
+ */
+export const ALCANCE_DEL_GOLPE = 2.5 * TALLA_A_PIE;
 
 /**
  * El ancho del golpe: medio cono de 45 grados a cada lado de la mirada. Se da como el CUADRADO

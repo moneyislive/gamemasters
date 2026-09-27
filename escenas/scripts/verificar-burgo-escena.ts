@@ -130,6 +130,7 @@ import {
   SUPERFICIE,
   TALLA_DEL_HOTEL,
   TALLA_DEL_PEON,
+  tallaDelPeon,
   TALLA_DE_LA_CASA,
   V_DE_LAS_CASAS,
   ANCHO_DEL_ROTULO,
@@ -188,6 +189,7 @@ import {
   vDeRadial,
 } from '../burgo/anillo-en-3d';
 import type { LetraEnElTablero, MarcoDeCasilla, PiezaDeCasilla, Puesta, Punto } from '../burgo/anillo-en-3d';
+import { ALTURA_DE_QUIEN_ANDA } from '../paseo/talla';
 import { BOCANADAS_DEL_HUMO as BOCANADAS_DEL_HUMO_EN_EL_COMPROBADOR, CASILLA_DEL_CANAL, CASILLA_DE_LA_CENTRAL, CASILLA_DE_LA_OFICINA, COLOR_DE_OBRA, DEL_MUNDO, MONEDA_DE_LA_RECAUDACION, ONDA_DEL_CANAL, bocaDeLaChimenea, carasDeLaOnda, carasDeUnaBocanada, centroDeLaAlberca, RECORRIDO_DE_LA_MONEDA, VIA, cajasDeLaOficina, triangulosDeLasPiezasVivas, caja as cajaDeObra, carasDeLaJoyaViva, carasDeLaMonedaDeLaRecaudacion, carasDeLaObraEnElMundo, carasDeLaRejaDeLaCelda, carasDeLaRuleta, carasDeLaTapa, carasDeLasObras, carasDelTren, casillasConObra, disco, esTriangulo, largoDeLaVia, letrasDeLosCarteles, monedaEnLaEscalinata, paradasDelTren, puntoEnLaVia, sitioDeLaRejaDeLaCelda, triangulosDeLasObras } from '../burgo/obras';
 import type { CaraDeObra } from '../burgo/obras';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
@@ -3080,7 +3082,12 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
    * Cambiar dos argumentos de sitio daría un hotel de 22,34 de fondo sobre una franja de 21.
    */
   const TALLAS_EN_LA_ESCENA: readonly { readonly que: string; readonly regex: RegExp; readonly cuantas: number }[] = [
-    { que: 'peón', regex: /auxEscala\.set\(\s*TALLA_DEL_PEON\s*,\s*TALLA_DEL_PEON\s*,\s*TALLA_DEL_PEON\s*\)/g, cuantas: 1 },
+    /*
+     * El peón, a la talla que le toca según desde dónde se mire (`tallaDelPeon`, desde el 27-sep-2026): la
+     * de la mesa, `TALLA_DEL_PEON`, o a pie la de quien anda. Se exige que la escena la pida con su `aPie`
+     * y que el peón se instancie con ella.
+     */
+    { que: 'peón', regex: /const tallaPeon = tallaDelPeon\(aPie\);[\s\S]*?auxEscala\.setScalar\(tallaPeon\)/g, cuantas: 1 },
     /* Tres sitios ponen una casa —la que brota, las cuatro que se hunden y la que se vende—, y las tres tienen que ir a la misma talla. */
     { que: 'casa', regex: /matrizDelBurgo\([^)]*TALLA_DE_LA_CASA\s*\*/g, cuantas: 3 },
     { que: 'hotel', regex: /matrizEstiradaDelBurgo\([^)]*TALLA_DEL_HOTEL\.ancho[^)]*TALLA_DEL_HOTEL\.alto[^)]*TALLA_DEL_HOTEL\.fondo[^)]*\)/g, cuantas: 1 },
@@ -3105,6 +3112,20 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
     'se ve fallar: un hotel con el fondo donde va el ancho, o dos casas de las tres a su talla, no encienden lo suyo',
     !aSuTalla('matrizEstiradaDelBurgo(h.x, ALTURA_DEL_REBORDE, h.z, giro, TALLA_DEL_HOTEL.fondo * brote, TALLA_DEL_HOTEL.alto * brote, TALLA_DEL_HOTEL.ancho * brote, auxMatriz)').includes('hotel') &&
       !aSuTalla('matrizDelBurgo(a, TALLA_DE_LA_CASA * x, m);\nmatrizDelBurgo(b, TALLA_DE_LA_CASA * y, m);').includes('casa'),
+  );
+  /*
+   * EL PEÓN A PIE MIDE LO QUE QUIEN ANDA. Desde la mesa es una ficha de 6,17 —la talla de arriba—; a pie
+   * esa ficha sería un monolito de casi cinco jugadores en el anillo que se anda. La vacuna: con la talla
+   * de la mesa también a pie, el peón le saca más de cuatro cuerpos al que pasa a su lado.
+   */
+  comprobar(
+    'y el peón a pie mide EXACTAMENTE lo que quien anda; desde la mesa, su talla de ficha',
+    Math.abs(ALTO_DEL_PEON_EN_EL_PACK * tallaDelPeon(true) - ALTURA_DE_QUIEN_ANDA) < 1e-9 && tallaDelPeon(false) === TALLA_DEL_PEON,
+    { aPie: ALTO_DEL_PEON_EN_EL_PACK * tallaDelPeon(true), quienAnda: ALTURA_DE_QUIEN_ANDA },
+  );
+  comprobar(
+    'se ve fallar: con la talla de la mesa a pie, el peón le saca más de cuatro cuerpos a quien anda',
+    (ALTO_DEL_PEON_EN_EL_PACK * TALLA_DEL_PEON) / ALTURA_DE_QUIEN_ANDA > 4,
   );
   /* Una posición, rotación o escala de JSX empieza por `[`: es una terna, no un Vector3 ni un objeto de otra copia de three. */
   const CON_VECTOR = /(position|rotation|scale)=\{\s*(?!\[)[^}]*\}/;

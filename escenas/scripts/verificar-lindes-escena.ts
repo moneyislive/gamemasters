@@ -102,6 +102,7 @@ import {
   sitiosDeLaLinde,
 } from '../linde-alta/la-linde';
 import { ALTURA_DE_UNA_PERSONA, ESCALA_DEL_PACK } from '../escala';
+import { ALTURA_DE_QUIEN_ANDA } from '../paseo/talla';
 /*
  * Las cámaras de a pie y el giro de la marioneta se miden en su casa de ahora, el paseo común:
  * `lindes/paseo.ts` las reexporta, pero lo que se vigila es lo que se usa, no el cartel.
@@ -1847,7 +1848,8 @@ paso('Las ayudas de la mesa se quedan en la mesa, que a pie son disparates');
   );
   comprobar(
     'y a pie mide EXACTAMENTE lo que el aventurero que anda a su lado',
-    Math.abs(ALTO_DEL_LABRIEGO * loQueEncogeElLabriego(true) - ALTURA_DE_UNA_PERSONA) < 1e-9,
+    /* El que anda, no la persona del mundo: desde el 27-sep-2026 quien anda mide la mitad (`paseo/talla.ts`). */
+    Math.abs(ALTO_DEL_LABRIEGO * loQueEncogeElLabriego(true) - ALTURA_DE_QUIEN_ANDA) < 1e-9,
     { aPie: (ALTO_DEL_LABRIEGO * loQueEncogeElLabriego(true)).toFixed(3) },
   );
   comprobar(

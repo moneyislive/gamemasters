@@ -28,6 +28,7 @@
  * del Burgo saliéndose del móvil: se medía desde la esquina en vez de desde donde se ve.
  */
 import { LADO_DE_LOSA } from './medidas';
+import { TALLA_A_PIE } from '../paseo/talla';
 
 /** A qué distancia de la cámara cuelga. Cualquiera vale: todo lo demás se mide contra ella. */
 /**
@@ -62,8 +63,13 @@ export const DISTANCIA_DE_LA_MANO = 60;
  * proporcional a la distancia, así que a cuatro unidades se ven EXACTAMENTE del mismo
  * tamaño en la pantalla y ya no llegan al suelo. Cuatro y no seis porque el margen tiene
  * que valer también para la cámara de ojos, que va más baja que la de hombro.
+ *
+ * Y VAN CON LA TALLA A PIE (`paseo/talla.ts`): desde el 27-sep-2026 quien anda mide la mitad y sus
+ * ojos van a la mitad de alto, así que a cuatro unidades los dos rincones volvían a meterse medio
+ * palmo en el suelo (`verify:lindes-escena`). A 4 × `TALLA_A_PIE` —dos— se ven igual de grandes y
+ * vuelven a quedar por encima; el plano cercano a pie es de media unidad (`Lindes.tsx`).
  */
-export const DISTANCIA_DE_LA_MANO_A_PIE = 4;
+export const DISTANCIA_DE_LA_MANO_A_PIE = 4 * TALLA_A_PIE;
 
 /**
  * ═══ CUÁNTO OCUPA, Y POR QUÉ SON DOS TOPES Y NO UNO ═══

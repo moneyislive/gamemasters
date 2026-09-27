@@ -30,6 +30,7 @@
  * nuevo que este binario— se pinta como una esfera neutra: se sigue viendo que ahí hay algo.
  */
 import * as THREE from 'three';
+import { TALLA_A_PIE } from './talla';
 
 /** Las clases que se saben pintar, y la de lo que no se sabe. */
 export const CLASES_DE_HALLAZGO = ['propina', 'cartera', 'maletin', 'hierro', 'pedernal', 'cuero', 'junco', 'escudo'] as const;
@@ -45,9 +46,12 @@ export function aspectoDe(clase: string): AspectoDeHallazgo {
 /** Lo que cabe a la vez: `brotesDeLaMesa` da once como mucho; el resto es holgura. */
 export const CAPACIDAD_DE_BROTES = 16;
 
-/** A qué altura sobre el suelo flota el centro de la pieza, y cuánto sube y baja. */
-export const FLOTA = 1.1;
-export const VAIVEN = 0.12;
+/**
+ * A qué altura sobre el suelo flota el centro de la pieza, y cuánto sube y baja: a la altura del
+ * pecho de quien anda, que desde el 27-sep-2026 mide la mitad (`TALLA_A_PIE`, `talla.ts`).
+ */
+export const FLOTA = 1.1 * TALLA_A_PIE;
+export const VAIVEN = 0.12 * TALLA_A_PIE;
 
 /** La luz de una clase: color (ya con su intensidad), alto de la columna y ancho, en unidades. */
 export interface LuzDeHallazgo {
@@ -76,18 +80,23 @@ function brillo(hex: string, cuanto: number): THREE.Color {
  * distinguía, y los edificios, de 10 a 40 de alto, la tapaban entera. Así que la pieza va un 60 % más
  * grande —la mitad de alto que quien anda— y la columna tres veces más alta, para asomar por
  * encima de una manzana; lo gruesa que es la da `geometriaDeLaLuz`.
+ *
+ * Y la PIEZA va con la talla de quien anda (`TALLA_A_PIE`): sigue midiendo la mitad que él, que
+ * ahora son 0,64 y no 1,27. A la de antes, una moneda le llegaba a la coronilla y un maletín era más
+ * ancho que él. La COLUMNA no encoge: es la señal que se ve desde lejos por encima de las manzanas, y
+ * las manzanas no han cambiado.
  */
 const PIEZAS: Readonly<Record<AspectoDeHallazgo, PiezaDeHallazgo>> = {
-  propina: { escala: 1.6, giro: 0.6, luz: { color: brillo('#ffd24a', 0.55), alto: 12, ancho: 1 } },
-  cartera: { escala: 1.6, giro: 0.4, luz: { color: brillo('#e0a060', 0.55), alto: 15, ancho: 1.2 } },
+  propina: { escala: 1.6 * TALLA_A_PIE, giro: 0.6, luz: { color: brillo('#ffd24a', 0.55), alto: 12, ancho: 1 } },
+  cartera: { escala: 1.6 * TALLA_A_PIE, giro: 0.4, luz: { color: brillo('#e0a060', 0.55), alto: 15, ancho: 1.2 } },
   /* El que más vale, el que más se ve: más alto, más ancho y casi blanco. */
-  maletin: { escala: 2, giro: 0.3, luz: { color: brillo('#fff2b0', 1), alto: 30, ancho: 2.2 } },
-  hierro: { escala: 1.6, giro: 0.4, luz: { color: brillo('#c8d6e6', 0.5), alto: 13, ancho: 1 } },
-  pedernal: { escala: 1.6, giro: 0.45, luz: { color: brillo('#ffae66', 0.5), alto: 13, ancho: 1 } },
-  cuero: { escala: 1.6, giro: 0.4, luz: { color: brillo('#e6b884', 0.5), alto: 13, ancho: 1 } },
-  junco: { escala: 1.6, giro: 0.35, luz: { color: brillo('#a6ea78', 0.5), alto: 13, ancho: 1 } },
-  escudo: { escala: 1.75, giro: 0.35, luz: { color: brillo('#86b6ff', 0.65), alto: 16, ancho: 1.3 } },
-  desconocida: { escala: 1.6, giro: 0.3, luz: { color: brillo('#ffffff', 0.4), alto: 10, ancho: 1 } },
+  maletin: { escala: 2 * TALLA_A_PIE, giro: 0.3, luz: { color: brillo('#fff2b0', 1), alto: 30, ancho: 2.2 } },
+  hierro: { escala: 1.6 * TALLA_A_PIE, giro: 0.4, luz: { color: brillo('#c8d6e6', 0.5), alto: 13, ancho: 1 } },
+  pedernal: { escala: 1.6 * TALLA_A_PIE, giro: 0.45, luz: { color: brillo('#ffae66', 0.5), alto: 13, ancho: 1 } },
+  cuero: { escala: 1.6 * TALLA_A_PIE, giro: 0.4, luz: { color: brillo('#e6b884', 0.5), alto: 13, ancho: 1 } },
+  junco: { escala: 1.6 * TALLA_A_PIE, giro: 0.35, luz: { color: brillo('#a6ea78', 0.5), alto: 13, ancho: 1 } },
+  escudo: { escala: 1.75 * TALLA_A_PIE, giro: 0.35, luz: { color: brillo('#86b6ff', 0.65), alto: 16, ancho: 1.3 } },
+  desconocida: { escala: 1.6 * TALLA_A_PIE, giro: 0.3, luz: { color: brillo('#ffffff', 0.4), alto: 10, ancho: 1 } },
 };
 
 export function piezaDe(aspecto: AspectoDeHallazgo): PiezaDeHallazgo {

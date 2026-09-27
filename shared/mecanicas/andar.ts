@@ -42,16 +42,47 @@ export const TICS_POR_SEGUNDO = 20;
 /** Lo que dura un tic, en Q16.16: 65.536 / 20 = 3.276,8, redondeado. */
 export const DT_DEL_TIC = 3277;
 
-/** A qué velocidad se anda, en unidades del mundo por segundo y en Q16.16: 12 u/s. */
-export const VELOCIDAD_ANDANDO = 786432;
+/**
+ * ═══ LAS VELOCIDADES VAN CON LA TALLA, Y EL SERVIDOR ACEPTA LAS DE ANTES ═══
+ *
+ * Se andaba a 12 u/s y se corría a 26,4 con un aventurero de 2,543 de alto: 4,7 cuerpos por segundo
+ * andando. Desde el 27-sep-2026 quien anda mide la mitad (`TALLA_A_PIE`, `talla.ts`), y a 12 u/s
+ * ese cuerpo cruzaba 9,4 cuerpos por segundo: parecía correr andando, y las piernas —que suenan a
+ * la velocidad del suelo partida por su zancada (`escenas/paseo/zancada.ts`), que también es la
+ * mitad— iban al doble de ritmo. Así que la velocidad baja con la talla, y el paso se ve como se
+ * veía: 6 u/s andando y 13,2 corriendo, los mismos cuerpos por segundo y el mismo ritmo de pies.
+ *
+ * Y NADIE QUE NO ACTUALICE SE QUEDA FUERA. La app 1.8.0/1.8.1 ya instalada lleva este fichero con
+ * los números viejos y anda a 26,4 corriendo; si el servidor midiera el presupuesto de distancia
+ * con la velocidad nueva, cada paso suyo sería «correr de más» y le llovería un `corrige` por tic.
+ * El servidor, por eso, NO usa estas dos: valida con `VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR`, que es la
+ * de correr de antes. Es un techo, no una marcha: el aparato nuevo va más despacio y cabe de sobra,
+ * y el viejo cabe como cabía. Lo que eso le deja a un tramposo es correr a 26,4, como ya podía.
+ * `verify:botas` lo mide con un aparato viejo corriendo a la velocidad vieja, que no recibe ninguna
+ * corrección.
+ */
 
-/** Y corriendo: 26,4 u/s (12 × 2,2, lo mismo que tenía el paseante de Las Lindes). */
-export const VELOCIDAD_CORRIENDO = 1730150;
+/** A qué velocidad se anda, en unidades del mundo por segundo y en Q16.16: 6 u/s (12 × `TALLA_A_PIE`). */
+export const VELOCIDAD_ANDANDO = 393216;
+
+/** Y corriendo: 13,2 u/s (6 × 2,2, la misma proporción que tenía el paseante de Las Lindes). */
+export const VELOCIDAD_CORRIENDO = 865075;
+
+/**
+ * LO MÁS DEPRISA QUE EL SERVIDOR ACEPTA QUE SE ANDE: 26,4 u/s, la velocidad de correr de la app
+ * 1.8.x, anterior a la talla a pie. Ver arriba. Sólo la lee el servidor (su presupuesto de distancia
+ * y lo lejos que se renace); no se baja mientras quede una app que corra a 26,4.
+ */
+export const VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR = 1730150;
 
 /**
  * El radio de quien anda, en Q16.16: 0,4 unidades. Una persona mide 2,543 de alto en esta casa
  * (`ALTURA_DE_UNA_PERSONA`), y 0,8 de hombro a hombro es lo que deja pasar entre dos almiares sin
  * que parezca que se atraviesan.
+ *
+ * NO encoge con la talla a pie (`talla.ts`): decide también dónde se nace y qué sitios valen al
+ * repartir los mundos de Riberas y de Las Lindes, y cambiarlo cambiaría los de las mesas que ya
+ * existen y los de la app instalada. Contra un cuerpo de ~0,65 de ancho deja un palmo hasta la pared.
  */
 export const RADIO_DEL_PASEANTE = 26214;
 

@@ -35,7 +35,8 @@
  *      durante un segundo. Es lo que ya venía de camino cuando salió la corrección: contestar a cada
  *      uno con otro `corrige` haría que el aparato, que ya estaba corregido, volviera a saltar atrás
  *      por cada paso que tenía en vuelo. Pasado el segundo, se vuelve a corregir.
- *   3. EL PRESUPUESTO DE DISTANCIA, por asiento: se rellena a `VELOCIDAD_CORRIENDO` por el tiempo
+ *   3. EL PRESUPUESTO DE DISTANCIA, por asiento: se rellena a `VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR` —la de
+ *      correr de la app 1.8.x, 26,4 u/s, más que la de correr de hoy: ver `andar.ts`— por el tiempo
  *      DE PARED que ha pasado, con un 25 % de holgura y un tope de un segundo acumulado. Un tramo
  *      más largo que lo que queda es correr de más o teletransportarse: `corrige`. Es por ASIENTO y
  *      no por canal para que abrir otro canal no rellene nada.
@@ -178,7 +179,7 @@ import {
   rumboDeRadianes,
   SENO,
   TICS_POR_SEGUNDO,
-  VELOCIDAD_CORRIENDO,
+  VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR,
 } from '../../../shared/mecanicas/andar';
 import type { Marcha } from '../../../shared/mecanicas/andar';
 import { deNumero, por, UNO } from '../../../shared/mecanicas/fijo';
@@ -193,17 +194,17 @@ import type { Aparicion } from './sitios';
 export const HOLGURA_DEL_PRESUPUESTO = 1.25;
 
 /** Cuánto presupuesto se puede acumular estando quieto: un segundo de correr, con su holgura. */
-export const TOPE_DEL_PRESUPUESTO = VELOCIDAD_CORRIENDO * HOLGURA_DEL_PRESUPUESTO;
+export const TOPE_DEL_PRESUPUESTO = VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR * HOLGURA_DEL_PRESUPUESTO;
 
 /** A qué ritmo se rellena, en Q16.16 por milisegundo de pared. */
-export const PRESUPUESTO_POR_MS = (VELOCIDAD_CORRIENDO * HOLGURA_DEL_PRESUPUESTO) / 1000;
+export const PRESUPUESTO_POR_MS = (VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR * HOLGURA_DEL_PRESUPUESTO) / 1000;
 
 /**
- * Lo más que se anda en un tic, con la holgura: `por(VELOCIDAD_CORRIENDO, DT_DEL_TIC)` son 1,32
+ * Lo más que se anda en un tic, con la holgura: `por(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, DT_DEL_TIC)` son 1,32
  * unidades, y con el 25 % 1,65. Es la medida de «a un tic de», para la corrección pendiente y para
  * la escuadra.
  */
-export const UN_TIC_CON_HOLGURA = por(VELOCIDAD_CORRIENDO, DT_DEL_TIC) * HOLGURA_DEL_PRESUPUESTO;
+export const UN_TIC_CON_HOLGURA = por(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, DT_DEL_TIC) * HOLGURA_DEL_PRESUPUESTO;
 
 /** Cuánto se calla una corrección pendiente antes de repetirse. Ver la cabecera, punto 2. */
 export const RECORDAR_LA_CORRECCION_MS = 1000;
@@ -298,8 +299,8 @@ export const IDA_Y_VUELTA_SUPUESTA_MS = 100;
  * (`REBOBINADO_MAXIMO_MS`, la «ventaja del que asoma» de 150-250 ms que aceptó Miguel). El `Math.min`
  * queda para quien suba la suposición: nunca se rebobina más que el tope.
  *
- * Lo que cuesta equivocarse, en el tablero: corriendo se hacen 26,4 u/s, 2,6 u cada 100 ms, que es el
- * alcance entero del golpe. Con 250 fijos, desde la wifi de casa —20 ms— se acierta a veces a quien
+ * Lo que cuesta equivocarse, en el tablero: corriendo se hacen 13,2 u/s (26,4 con la app 1.8.x), 1,3 u
+ * cada 100 ms, que es el alcance entero del golpe. Con 250 fijos, desde la wifi de casa —20 ms— se acierta a veces a quien
  * ya se había ido un paso; desde un tren —300 ms— se falla lo que se creía acertar. Es la ventaja
  * aceptada, y está del lado de quien juega desde el móvil.
  *
@@ -375,10 +376,12 @@ export const RADIO_DEL_LANZAMIENTO = Math.floor(RADIO_DEL_PASEANTE / 4);
 
 /**
  * LEJOS, AL RENACER: lo que corre quien te tumbó mientras dura lo intocable. 26,4 u/s × 2 s = 52,8 u.
+ * Con la velocidad que ACEPTA el servidor y no con la de correr de hoy (13,2): quien te tumbó puede
+ * llevar todavía la app 1.8.x, y los sitios de renacer del Burgo se midieron contra estos 52,8.
  * Un sitio de nacer a esa distancia de él es uno al que no llega antes de que acabe la protección.
  * Ver `sitioDeRenacer`.
  */
-export const LEJOS_AL_RENACER = por(VELOCIDAD_CORRIENDO, deNumero(INTOCABLE_MS / 1000));
+export const LEJOS_AL_RENACER = por(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, deNumero(INTOCABLE_MS / 1000));
 
 /**
  * EL TOPE DE BOTINES POR MESA Y MINUTO: seis. Sólo cuentan los que ENTRAN.

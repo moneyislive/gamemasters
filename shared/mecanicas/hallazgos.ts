@@ -16,10 +16,15 @@
 import { RADIO_DEL_PASEANTE } from './andar';
 import { UNO } from './fijo';
 import { sePuedeEstar } from './mundo';
+import { TALLA_A_PIE } from './talla';
 import type { Arena } from './mundo';
 
-/** A qué distancia se recoge, en unidades del mundo: un paso largo. */
-export const RADIO_DE_RECOGER = 1.5;
+/**
+ * A qué distancia se recoge, en unidades del mundo: un paso largo. Eran 1,5 con un cuerpo de 2,543, y
+ * va con la talla a pie (`TALLA_A_PIE`, `talla.ts`): 0,75. Con 1,5 un cuerpo de la mitad recogía a
+ * más de un cuerpo de distancia, y se veía coger el brote sin haber llegado a él.
+ */
+export const RADIO_DE_RECOGER = 1.5 * TALLA_A_PIE;
 
 /** El mismo radio en Q16.16, al cuadrado: el servidor compara distancias sin raíces. */
 export const RADIO_DE_RECOGER_AL_CUADRADO_FIJO = (RADIO_DE_RECOGER * UNO) ** 2;

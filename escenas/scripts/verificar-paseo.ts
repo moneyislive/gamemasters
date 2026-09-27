@@ -48,6 +48,7 @@ import {
   RUMBOS,
   rumboDeRadianes,
   rumboValido,
+  TICS_POR_SEGUNDO,
   VELOCIDAD_ANDANDO,
   VELOCIDAD_CORRIENDO,
 } from '../../shared/mecanicas/andar';
@@ -95,7 +96,9 @@ import {
 } from '../paseo/paseante';
 import type { EstadoDelPaseo } from '../paseo/paseante';
 import { clipDelPaso, CORRE_A_PARTIR_DE, ritmoDelClip, ZANCADA_DE_ANDAR, ZANCADA_DE_CORRER } from '../paseo/zancada';
+import { TALLA_A_PIE } from '../paseo/talla';
 import { medirElAdornoQueChoca } from './paseo-con-adorno';
+import { medirLaTallaAPie } from './talla-a-pie';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -495,13 +498,15 @@ paso('Contra un cuerpo del mundo se para sin meterse, y de lado resbala');
     quieto,
   });
 
-  const enDiagonal = andar(CON_MURALLA, nacerEnElPaseo(CON_MURALLA, { x: 0, z: 0, rumbo: Math.PI / 4 }), conTeclas(ADELANTE), 120);
+  /* Cuatro segundos: a 6 u/s en diagonal se llega a la muralla hacia el tic 46, y quedan treinta y tantos resbalando. */
+  const enDiagonal = andar(CON_MURALLA, nacerEnElPaseo(CON_MURALLA, { x: 0, z: 0, rumbo: Math.PI / 4 }), conTeclas(ADELANTE), 240);
   const cola = enDiagonal.sitios.slice(-15);
   let resbalaMal = 0;
   for (let i = 1; i < cola.length; i++) {
     const a = cola[i - 1] as Andante;
     const b = cola[i] as Andante;
-    if (b.z !== a.z || aNumero(b.x - a.x) < 0.3) resbalaMal++;
+    /* Resbala si avanza hacia el este por lo menos medio tic de andar: 0,15 a 6 u/s (0,3 cuando se andaba a 12). */
+    if (b.z !== a.z || aNumero(b.x - a.x) < aNumero(VELOCIDAD_ANDANDO) / TICS_POR_SEGUNDO / 2) resbalaMal++;
   }
   const seMete = enDiagonal.sitios.some((s) => s.z - RADIO_DEL_PASEANTE < bordeDelMuro);
   comprobar(
@@ -710,7 +715,8 @@ paso('Nadie se queda encerrado: si donde se nace no se cabe, se nace en el sitio
   );
   /* Y desde ahí se anda: hacia fuera de la muralla, que según el lado es delante o detrás. */
   const alNorteDelMuro = aNumero(enElMuro.ahora.z) < MURALLA.z0;
-  const sale = andar(CON_MURALLA, enElMuro, conTeclas(alNorteDelMuro ? ADELANTE : ATRAS), 20).estado;
+  /* Cuarenta tics: dos segundos, que hacia atrás y a la velocidad de la talla a pie (`andar.ts`) pasan de dos unidades. */
+  const sale = andar(CON_MURALLA, enElMuro, conTeclas(alNorteDelMuro ? ADELANTE : ATRAS), 40).estado;
   comprobar('y desde ahí se puede andar, alejándose de la muralla', Math.abs(aNumero(sale.ahora.z - enElMuro.ahora.z)) > 2, {
     alNorteDelMuro,
     desde: aNumero(enElMuro.ahora.z),
@@ -923,12 +929,17 @@ paso('La cámara de hombro no se queda detrás del adorno: ni de una señal, ni 
 {
   const quien = { x: 0, z: 0, rumbo: 0 };
   const pecho = { x: 0, y: LO_QUE_HAY_QUE_VER, z: 0 };
-  /* El panel: dos de ancho, de 2,5 a 4,5 de alto, a cuatro por detrás (al sur: la cámara mira al norte). */
-  const SENAL: Estorbo = { x0: -1, y0: 2.5, z0: 3.95, x1: 1, y1: 4.5, z1: 4.05 };
+  /*
+   * El panel: dos de ancho, de 2,5 a 4,5 de alto, a cuatro por detrás (al sur: la cámara mira al norte),
+   * medido para quien anda a la talla de la persona del mundo. Las cámaras van en alturas de quien anda
+   * (`camaras.ts`), así que la escena de prueba encoge con `TALLA_A_PIE` y el encuadre es el mismo.
+   */
+  const T = TALLA_A_PIE;
+  const SENAL: Estorbo = { x0: -1 * T, y0: 2.5 * T, z0: 3.95 * T, x1: 1 * T, y1: 4.5 * T, z1: 4.05 * T };
   const conSenal = indiceDeEstorbos([SENAL]);
   const soloArena = hastaDondeCabeElHombro(ABIERTO, quien);
   const antes = camaraDeHombro(quien, 0, acercarElHombro(null, soloArena, 1 / 60));
-  console.log(`  con la arena sola la cámara se queda a ${soloArena.toFixed(2)} por detrás; la señal está a 3,95`);
+  console.log(`  con la arena sola la cámara se queda a ${soloArena.toFixed(2)} por detrás; la señal está a ${(3.95 * T).toFixed(2)}`);
   comprobar(
     'la vacuna: con la arena sola, la cámara se queda detrás de la señal, que le tapa a quien pasea',
     tapaLaVista(conSenal, pecho, { x: antes.x, y: antes.y, z: antes.z }),
@@ -945,7 +956,7 @@ paso('La cámara de hombro no se queda detrás del adorno: ni de una señal, ni 
   console.log(`  con la señal declarada: hasta ${noTapa.toFixed(2)} no tapa, y la cámara acaba a ${(atras ?? 0).toFixed(2)}`);
   comprobar(
     'y declarándola, la cámara se pone delante de la señal: a partir del primer fotograma a pie no la tiene delante nunca',
-    noTapa < 3.95 && noTapa >= 3 && peor === 0 && atras !== null && atras < 3.95,
+    noTapa < 3.95 * T && noTapa >= 3 * T && peor === 0 && atras !== null && atras < 3.95 * T,
     { noTapa, atras, peor },
   );
 
@@ -1010,7 +1021,7 @@ paso('La cámara de hombro no se queda detrás del adorno: ni de una señal, ni 
   );
 
   /* Una copa que envuelve a quien pasea no se mete entre él y la cámara: la tiene encima. */
-  const copa = indiceDeEstorbos([{ x0: -3, y0: 1, z0: -3, x1: 3, y1: 5, z1: 3 }]);
+  const copa = indiceDeEstorbos([{ x0: -3 * T, y0: 1 * T, z0: -3 * T, x1: 3 * T, y1: 5 * T, z1: 3 * T }]);
   comprobar(
     'y bajo la copa de un árbol que le envuelve el pecho, la cámara no se echa a la nuca por ella',
     hastaDondeNoTapa(copa, quien, 0, soloArena) === soloArena,
@@ -1259,6 +1270,7 @@ paso('El golpe y el suelo: la G golpea sin comerse la de un campo, un toque es u
 
 // ---------------------------------------------------------------------------
 await medirElAdornoQueChoca(comprobar, paso);
+await medirLaTallaAPie(comprobar, paso);
 
 paso('El montaje: la escena y la app usan esto, y no otra cosa');
 // ---------------------------------------------------------------------------
@@ -1325,14 +1337,20 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
     { x0: -0.3, y0: 0, z0: -0.3, x1: 0.3, y1: 2, z1: 0.3 },
     { x0: -1.5, y0: 2, z0: -1.5, x1: 1.5, y1: 6, z1: 1.5 },
   ];
-  const copia = (x: number, z: number): { posicion: { x: number; y: number; z: number }; giro: number; escala: { x: number } } => ({
+  /*
+   * El pino y su sitio van a `TALLA_A_PIE`: la escena se midió para quien anda a la talla de la persona
+   * del mundo, y las cámaras van en alturas de quien anda (`camaras.ts`). Encogida con él, el pino queda
+   * entre la nuca y donde iría la cámara igual que antes.
+   */
+  const TP = TALLA_A_PIE;
+  const copia = (x: number, z: number, escala = 1): { posicion: { x: number; y: number; z: number }; giro: number; escala: { x: number } } => ({
     posicion: { x, y: 0, z },
     giro: 0,
-    escala: { x: 1 },
+    escala: { x: escala },
   });
   const delDelta = estorbosDelDelta(
     new Map([
-      ['0,0|pino', [copia(0, 4.5)]],
+      ['0,0|pino', [copia(0, 4.5 * TP, TP)]],
       ['mar|desconocido', [copia(30, 30)]],
     ]),
     [{ modelo: 'casa', puesta: copia(-20, -20) }],
@@ -1350,7 +1368,7 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
     delDelta,
   );
   comprobar(
-    'y con un pino a 4,5 por detrás, la arena sola deja la cámara detrás de la copa; con el adorno del delta, delante',
+    `y con un pino a ${(4.5 * TP).toFixed(2)} por detrás, la arena sola deja la cámara detrás de la copa; con el adorno del delta, delante`,
     tapaLaVista(conElPino, pechoEnElDelta, sinAdorno) && !tapaLaVista(conElPino, pechoEnElDelta, conAdorno),
     { cabeEnElDelta, sinAdorno, conAdorno },
   );

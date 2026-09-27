@@ -87,9 +87,9 @@ export function mundoDePrueba(): MundoDeclarado {
  */
 export interface Paseo {
   huella: number;
-  /** Paradas en seco por tropezar con un cuerpo. */
+  /** Tics en que un cuerpo no dejó dar el paso entero: parado en seco o resbalando. */
   porCuerpo: number;
-  /** Paradas en seco por llegar al borde de lo pisable. */
+  /** Tics en que el borde de lo pisable no dejó dar el paso entero. */
   porBorde: number;
   /** Pasos en los que sólo se pudo avanzar por un eje. */
   resbalados: number;
@@ -103,7 +103,7 @@ export interface Paseo {
   z: number;
 }
 
-/** Cada cuántos tics se cambia de rumbo. 256 tics a 0,6-1,32 u ≈ 150-340 unidades: se cruzan losas. */
+/** Cada cuántos tics se cambia de rumbo. 256 tics a 0,3-0,66 u ≈ 77-170 unidades: se cruza una losa. */
 const TICS_POR_TRAMO = 256;
 
 /** El paseo. La misma función en proceso y dentro del paquete. */
@@ -136,23 +136,30 @@ export function pasear(): Paseo {
     quien = pasoDelTic(a, quien, rumbo, marcha);
     const movioX = quien.x !== antes.x;
     const movioZ = quien.z !== antes.z;
-    if (!movioX && !movioZ) {
+    /* El destino, calculado EXACTAMENTE como lo calcula `unPaso`, mitad en el vado incluida. */
+    const v = marcha === CORRIENDO ? VELOCIDAD_CORRIENDO : VELOCIDAD_ANDANDO;
+    let dx = por(por(v, SENO[rumbo] as number), DT_DEL_TIC);
+    let dz = por(-por(v, COSENO[rumbo] as number), DT_DEL_TIC);
+    if (vadeando) {
+      dx = (dx / 2) | 0;
+      dz = (dz / 2) | 0;
+    }
+    if (quien.x !== antes.x + dx || quien.z !== antes.z + dz) {
       /*
-       * QUÉ lo paró, no sólo QUE lo pararon. Si el destino no tenía piso, fue el borde; si lo
-       * tenía, fue un cuerpo. Sin esta distinción el suelo del comprobador lo cumple el borde
-       * él solo y los cuerpos pueden estar apagados enteros.
+       * QUÉ lo tropezó, no sólo QUE lo tropezaron: el paso entero no se dio. Si su destino no tenía
+       * piso, fue el borde; si lo tenía, fue un cuerpo. Sin esta distinción el suelo del comprobador
+       * lo cumple el borde él solo y los cuerpos pueden estar apagados enteros.
+       *
+       * Se cuenta todo tropiezo —pararse en seco o resbalar— y no sólo la parada en seco, que es lo que
+       * se contaba hasta el 27-sep-2026. Desde que quien anda mide la mitad y anda a la mitad
+       * (`shared/mecanicas/talla.ts`), con pasos de 0,3-0,66 se resbala alrededor de estos cuerpos
+       * pequeños y casi nunca se para en seco: en 40.000 tics, cero paradas por un cuerpo, y el
+       * comprobador habría leído «los cuerpos están apagados» con los cuerpos funcionando.
        */
-      /* El destino, calculado EXACTAMENTE como lo calcula `unPaso`, mitad en el vado incluida. */
-      const v = marcha === CORRIENDO ? VELOCIDAD_CORRIENDO : VELOCIDAD_ANDANDO;
-      let dx = por(por(v, SENO[rumbo] as number), DT_DEL_TIC);
-      let dz = por(-por(v, COSENO[rumbo] as number), DT_DEL_TIC);
-      if (vadeando) {
-        dx = (dx / 2) | 0;
-        dz = (dz / 2) | 0;
-      }
       if (hayPiso(a, antes.x + dx, antes.z + dz)) porCuerpo++;
       else porBorde++;
-    } else if (!movioX || !movioZ) resbalados++;
+      if (movioX !== movioZ) resbalados++;
+    }
     if (!hayPiso(a, quien.x, quien.z)) fuera++;
     h = (h ^ quien.x) | 0;
     h = Math.imul(h, 2654435761) | 0;

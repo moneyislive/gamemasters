@@ -50,6 +50,8 @@ import {
   LO_QUE_SE_SALE_EN_UN_TIC,
   MICROS_POR_TIC,
   mudarDeMundo,
+  quedaEncerrado,
+  salidaDelAdorno,
   nacerEnElPaseo,
   poseDelPaseo,
   ticDelPaseo,
@@ -57,6 +59,7 @@ import {
 import type { EstadoDelPaseo } from '../paseo/paseante';
 import { rodajasDelCatalogo } from '../paseo/rodajas-del-catalogo';
 import { ESCALA_DEL_PACK } from '../escala';
+import { TALLA_A_PIE } from '../paseo/talla';
 import { burgoConAdorno, deltaConAdorno, elCatalogoDelBurgo, elCatalogoDelTablero, lindesConAdorno, medirBolsillos } from './adorno-en-node';
 import type { MundoConAdorno } from './adorno-en-node';
 
@@ -122,9 +125,15 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
   const deUnaLamina = cuerposDePiezas([{ pieza: 'paso-de-cebra', x: 0, y: 0, z: 0, giro: 0, talla: 1 }], () => LAMINA, () => 0);
   const deUnPalet = cuerposDePiezas([{ pieza: 'palet', x: 0, y: 0.6, z: 0, giro: 0, talla: 1 }], rodajasFinas, () => 0.6);
   const deUnBanco = cuerposDePiezas([{ pieza: 'banco-de-calle', x: 0, y: 0.6, z: 0, giro: 0, talla: 1 }], rodajasFinas, () => 0.6);
+  /*
+   * EL PALET CAMBIÓ DE LADO CON LA TALLA A PIE. Con quien anda a la talla de la persona del mundo, lo que
+   * se pisaba llegaba a 0,305 y el palet (0,30) se pisaba. Desde que mide la mitad (`talla.ts`) el tobillo
+   * está en ${LO_QUE_SE_PISA.toFixed(3)} y un palet le llega a la rodilla: choca, como la papelera. La
+   * lámina sigue pisándose.
+   */
   comprobar(
-    `una lámina a ras de suelo (un paso de cebra) y un palet (0,30, por debajo de ${LO_QUE_SE_PISA.toFixed(3)}) no chocan; un banco sí`,
-    deUnaLamina.length === 0 && deUnPalet.length === 0 && deUnBanco.length > 0,
+    `una lámina a ras de suelo (un paso de cebra) no choca; un palet (0,30, por encima de ${LO_QUE_SE_PISA.toFixed(3)} desde la talla a pie) y un banco sí`,
+    deUnaLamina.length === 0 && deUnPalet.length > 0 && deUnBanco.length > 0 && LO_QUE_SE_PISA < 0.3,
     { deUnaLamina, deUnPalet, deUnBanco: deUnBanco.length },
   );
   const LA_MISMA_LAMINA_ALZADA: readonly Estorbo[] = [{ x0: -2, y0: 0, z0: -1.5, x1: 2, y1: 0.5, z1: 1.5 }];
@@ -205,10 +214,13 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
     for (const s of m.mundo.nace) {
       if (!sePuedeEstar(arena, deNumero(s.x), deNumero(s.z), RADIO_DEL_PASEANTE)) dentro++;
       if (b.bolsilloDe(s.x, s.z) !== null) enBolsillo++;
-      /* Y se anda: de dieciséis rumbos, alguno lleva a más de diez unidades en veinte tics. */
+      /*
+       * Y se anda: de dieciséis rumbos, alguno lleva a más de diez unidades en cuarenta tics (veinte a la
+       * velocidad de antes de la talla a pie, que era el doble: `andar.ts`).
+       */
       let lejos = 0;
       for (let k = 0; k < 16; k++) {
-        const fin = andar(arena, s.x, s.z, (k * Math.PI) / 8, 20);
+        const fin = andar(arena, s.x, s.z, (k * Math.PI) / 8, 40);
         lejos = Math.max(lejos, Math.hypot(aNumero(fin.x) - s.x, aNumero(fin.z) - s.z));
       }
       if (lejos < 10) sinSalir++;
@@ -272,6 +284,7 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
     let malos = 0;
     let largos = 0;
     let saltosDeAntes = 0;
+    let enUnClaro = 0;
     const ejemplos: unknown[] = [];
     const paso_ = Math.max(1, Math.floor(m.adorno.length / 600));
     for (let k = 0; k < m.adorno.length; k += paso_) {
@@ -293,7 +306,18 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
       if (tics > 6) largos++;
       const fuera = sePuedeEstar(arena, e.ahora.x, e.ahora.z, RADIO_DEL_PASEANTE);
       const suelto = b.bolsilloDe(aNumero(e.ahora.x), aNumero(e.ahora.z)) === null;
-      if (!bien || !fuera || !suelto) {
+      /*
+       * UN CLARO CERRADO DE NACIMIENTO: una pieza dentro de un claro que el adorno cierra por todas partes
+       * (el tocón de un claro entre dos arboledas del delta, medido el 27-sep-2026). Toda salida que no es
+       * el claro queda al otro lado de él, y el primer tic que pisa suelo cae dentro: no hay manera de
+       * salir andando a otro sitio. El servidor no pone a nadie ahí —se nace y se renace fuera de todo
+       * bolsillo, que es otra comprobación de aquí—, así que no cuenta como rescate malo; pero se cuentan,
+       * tienen que ser raros, y hasta en ellos se sale andando y en recta.
+       */
+      const salida = salidaDelAdorno(arena, estructura, { x, z });
+      const claro = !suelto && bien && fuera && salida !== null && quedaEncerrado(arena, salida.x, salida.z);
+      if (claro) enUnClaro++;
+      if (!bien || !fuera || (!suelto && !claro)) {
         malos++;
         if (ejemplos.length < 3) ejemplos.push({ x: aNumero(x), z: aNumero(z), tics, bien, fuera, suelto });
       }
@@ -301,12 +325,13 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
       const deAntes = ticDelPaseo(arenaDe({ ...m.mundo, cuerpos: [...m.mundo.cuerpos, ...m.adorno] }), { ...e, antes: { x, z }, ahora: { x, z } }, { rumbo: 0, marcha: QUIETO });
       if (Math.hypot(deAntes.ahora.x - x, deAntes.ahora.z - z) > UN_TIC_CON_HOLGURA) saltosDeAntes++;
     }
-    console.log(`  ${nombre}: ${String(casos)} sitios dentro del adorno, ${String(largos)} tardan más de seis tics en salir; con el rescate de antes, ${String(saltosDeAntes)} saltarían más de lo que el servidor acepta`);
+    console.log(`  ${nombre}: ${String(casos)} sitios dentro del adorno, ${String(largos)} tardan más de seis tics en salir, ${String(enUnClaro)} en un claro cerrado; con el rescate de antes, ${String(saltosDeAntes)} saltarían más de lo que el servidor acepta`);
     comprobar(
-      `en ${nombre}, desde dentro del adorno se sale andando: un tic de correr por tic, en recta por la estructura, fuera de todo bolsillo`,
+      `en ${nombre}, desde dentro del adorno se sale andando: un tic de correr por tic, en recta por la estructura, fuera de todo bolsillo salvo en un claro cerrado de nacimiento`,
       casos > 20 && malos === 0,
       { casos, malos, ejemplos },
     );
+    comprobar(`y en ${nombre}, las piezas en un claro cerrado de nacimiento son como mucho una de cada cien`, enUnClaro * 100 <= casos, { enUnClaro, casos });
     comprobar(`la vacuna: en ${nombre}, el rescate de un salto caería lejos de donde el servidor espera el primer paso`, saltosDeAntes > 0, saltosDeAntes);
   }
   /* Y una corrección que cae dentro del adorno NO salta: `mudarDeMundo` con la estructura la deja ahí. */
@@ -377,7 +402,8 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
         pasadas++;
         let e = nacerEnElPaseo(arena, { x: desdeX, z: desdeZ, rumbo: Math.PI });
         let atras: number | null = null;
-        for (let t = 0; t < 30; t++) {
+        /* Sesenta tics a 6 u/s: las mismas dieciocho unidades que treinta a 12, la velocidad de antes de la talla a pie. */
+        for (let t = 0; t < 60; t++) {
           e = ticDelPaseo(arena, e, { rumbo: rumboDeRadianes(Math.PI), marcha: ANDANDO });
           for (let f = 0; f < 3; f++) {
             const q = poseDelPaseo({ ...e, rumbo: Math.PI, sobra: Math.round((f / 3) * MICROS_POR_TIC) });
@@ -397,7 +423,12 @@ export async function medirElAdornoQueChoca(comprobar: Comprobar, paso: (titulo:
     console.log(
       `  andando contra ${String(ahora.pasadas)} pinos y arbustos del Burgo: antes se atravesaban ${String(antes.alOtroLado)} y la cámara se acercaba hasta ${antes.peorTiron.toFixed(2)} en un fotograma; ahora se atraviesan ${String(ahora.alOtroLado)} y el peor tirón es de ${ahora.peorTiron.toFixed(2)}`,
     );
-    comprobar('la vacuna: con la arena de antes se atravesaban y la cámara daba tirones de más de una unidad', antes.alOtroLado > antes.pasadas / 2 && antes.peorTiron > 1);
+    /* Los tirones, en alturas de quien anda: la cámara va a `TALLA_A_PIE` de lo que iba (`camaras.ts`). */
+    comprobar(
+      `la vacuna: con la arena de antes se atravesaban y la cámara daba tirones de más de ${TALLA_A_PIE.toFixed(2)} (una unidad a la talla de antes)`,
+      antes.alOtroLado > antes.pasadas / 2 && antes.peorTiron > TALLA_A_PIE,
+      antes,
+    );
     comprobar('con el adorno que choca no se atraviesa ninguno, y la cámara no da tirones', ahora.alOtroLado === 0 && ahora.peorTiron < 0.25, ahora);
   }
 

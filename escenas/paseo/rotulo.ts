@@ -55,9 +55,9 @@
  */
 import * as THREE from 'three';
 import { VIDA_ENTERA } from '../../shared/mecanicas/canal-de-botas';
-import { ALTURA_DE_UNA_PERSONA } from '../escala';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA, CONTORNOS_DE_LA_LETRA, ORIGEN_DE_LA_LETRA } from '../iconos';
 import type { Corazones } from './refriega';
+import { ALTURA_DE_QUIEN_ANDA } from './talla';
 
 /** Lo que ocupa una mayúscula del rótulo en la pantalla, en fracción de su alto. */
 export const PARTE_DE_LA_PANTALLA = 0.032;
@@ -69,8 +69,12 @@ export const ALTO_MAXIMO_DEL_ROTULO = 12;
 /** Cuántas letras se escriben como mucho: un nombre de la mesa, no una frase. */
 export const LETRAS_DEL_ROTULO = 20;
 
-/** A qué altura sobre los pies va el canto de abajo de la placa: un pelo por encima de la cabeza. */
-export const ALTURA_DEL_ROTULO = ALTURA_DE_UNA_PERSONA * 1.1;
+/**
+ * A qué altura sobre los pies va el canto de abajo de la placa: un pelo por encima de la cabeza. De
+ * la cabeza de QUIEN ANDA (`talla.ts`), no de la persona del mundo: con ésa, desde que la figura mide
+ * la mitad, la placa flotaría a otra figura entera por encima de ella.
+ */
+export const ALTURA_DEL_ROTULO = ALTURA_DE_QUIEN_ANDA * 1.1;
 
 /** El hueco de un espacio, en mayúsculas. */
 const HUECO_DE_UN_ESPACIO = 0.4;

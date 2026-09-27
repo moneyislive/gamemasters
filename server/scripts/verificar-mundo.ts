@@ -316,7 +316,7 @@ paso('Un paseo largo, y que se haya chocado de verdad');
 
 const paseo = pasear();
 console.log(
-  `  ${String(PASOS)} tics · parado por un cuerpo ${String(paseo.porCuerpo)} · por el borde ${String(paseo.porBorde)} · ` +
+  `  ${String(PASOS)} tics · tropezado por un cuerpo ${String(paseo.porCuerpo)} · por el borde ${String(paseo.porBorde)} · ` +
     `resbalando ${String(paseo.resbalados)} · en el vado ${String(paseo.enElVado)} · ${String(paseo.rumbosAndados)} rumbos · ` +
     `acaba en x=${(paseo.x / UNO).toFixed(2)} z=${(paseo.z / UNO).toFixed(2)}`,
 );

@@ -12,9 +12,15 @@
  *
  * El alcance va en unidades del mundo y el cono como el CUADRADO del coseno de su medio ángulo,
  * que es como lo compara el servidor sin raíces (`COSENO_CUADRADO_DEL_CONO` del canal). Los puños
- * son exactamente la refriega de antes: 1 de daño, 2,5 de alcance y 45°.
+ * son exactamente la refriega de antes: 1 de daño, el alcance del golpe (`ALCANCE_DEL_GOLPE`) y 45°.
+ *
+ * Los alcances se escribieron para un cuerpo de 2,543 —6, 4, 2,5 y 2— y van por `TALLA_A_PIE`
+ * (`shared/mecanicas/talla.ts`): con quien anda a la mitad, la honda llega a 3, la lanza a 2 y la
+ * maza a 1. Las proporciones entre armas no cambian; lo que cambia es que ninguna alcance el
+ * doble de cuerpos que alcanzaba.
  */
 import { ALCANCE_DEL_GOLPE, COSENO_CUADRADO_DEL_CONO } from '../../mecanicas/canal-de-botas';
+import { TALLA_A_PIE } from '../../mecanicas/talla';
 
 /**
  * EL MOVIMIENTO DE FORJAR: `{ tipo: FORJAR, carga: { arma } }`, del colono que forja. Se ofrece
@@ -75,13 +81,13 @@ export const FICHA_DEL_ARMA: Readonly<Record<Arma, FichaDelArma>> = {
   honda: {
     nombre: 'Honda',
     receta: { cuero: 2, pedernal: 1 },
-    refriega: { dano: 1, alcance: 6, cosenoCuadrado: COS2_20 },
+    refriega: { dano: 1, alcance: 6 * TALLA_A_PIE, cosenoCuadrado: COS2_20 },
     ayuda: 'Llega lejos, pero hay que apuntar bien.',
   },
   lanza: {
     nombre: 'Lanza',
     receta: { junco: 2, hierro: 1 },
-    refriega: { dano: 1, alcance: 4, cosenoCuadrado: COS2_30 },
+    refriega: { dano: 1, alcance: 4 * TALLA_A_PIE, cosenoCuadrado: COS2_30 },
     ayuda: 'Mantiene a raya a quien se acerca.',
   },
   hacha: {
@@ -93,7 +99,7 @@ export const FICHA_DEL_ARMA: Readonly<Record<Arma, FichaDelArma>> = {
   maza: {
     nombre: 'Maza',
     receta: { pedernal: 2, junco: 1 },
-    refriega: { dano: 2, alcance: 2, cosenoCuadrado: COS2_60 },
+    refriega: { dano: 2, alcance: 2 * TALLA_A_PIE, cosenoCuadrado: COS2_60 },
     ayuda: 'Muy corta, pero barre todo lo que tiene delante.',
   },
 };

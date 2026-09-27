@@ -31,6 +31,7 @@
  * `shared/mecanicas/`, esta copia se borra.
  */
 import { COSENO, RADIO_DEL_PASEANTE, RUMBOS, rumboDeRadianes, SENO } from '../../../shared/mecanicas/andar';
+import { TALLA_A_PIE } from '../../../shared/mecanicas/talla';
 import { por } from '../../../shared/mecanicas/fijo';
 import { sePuedeEstar } from '../../../shared/mecanicas/mundo';
 import type { Andante, Arena } from '../../../shared/mecanicas/mundo';
@@ -42,10 +43,16 @@ export const ANILLOS_DEL_RESCATE = 48;
 export const DIRECCIONES_DEL_RESCATE = 32;
 
 /**
- * A qué distancia de otro no se nace, en Q16.16: cuatro radios, 1,6 unidades. Dos hombros de
- * holgura: juntos pero no encima.
+ * A qué distancia de otro no se nace, en Q16.16: 0,8 unidades. Juntos pero no encima.
+ *
+ * Eran cuatro radios, 1,6, con un cuerpo de 2,543 de alto y ~1,3 de ancho: dos hombros de holgura.
+ * Desde que quien anda mide la mitad (`TALLA_A_PIE`, `shared/mecanicas/talla.ts`) va con la talla:
+ * con 1,6 dos que nacen juntos quedaban a dos cuerpos y medio, y fuera del alcance del golpe (1,25),
+ * que también encogió. Con 0,8 los dos cuerpos —de ~0,65 de ancho— quedan a un palmo. Sólo lo usa
+ * el servidor para elegir dónde aparece alguien: ningún aparato lo sabe, así que cambiarlo no deja
+ * fuera a la app instalada.
  */
-export const SEPARACION_AL_NACER = RADIO_DEL_PASEANTE * 4;
+export const SEPARACION_AL_NACER = Math.round(RADIO_DEL_PASEANTE * 4 * TALLA_A_PIE);
 
 /**
  * EL PRIMER SITIO QUE `admite`, en anillos alrededor de `(x, z)`; el propio sitio primero. `null`

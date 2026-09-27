@@ -242,7 +242,8 @@ import {
   SUBIDA_DE_LA_REJA,
   SUPERFICIE,
   TALLA_DEL_HOTEL,
-  TALLA_DEL_PEON,
+  tallaDelPeon,
+  loQueEncogeElDiscoDelPeon,
   TALLA_DE_LA_CASA,
   campo,
   huecoDeBandera,
@@ -364,6 +365,7 @@ import { estorbosDelBurgo, trozosDelAdornoDelBurgo } from './estorbos-del-burgo'
 import { usarElAdorno } from '../paseo/usar-el-adorno';
 import { ALTO_DE_UNA_RODAJA_QUE_CHOCA, TOPE_DE_RODAJAS_QUE_CHOCAN } from '../paseo/adorno-que-choca';
 import { QuienAnda } from '../paseo/quien-anda';
+import { TALLA_A_PIE } from '../paseo/talla';
 import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
 import { LosHallazgos } from '../paseo/los-hallazgos';
@@ -2378,6 +2380,12 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
       const sorteo = sonando.find((x) => x.suceso.que === 'sale' && x.suceso.ronda <= 1);
       const apuro = enCursoDe('apuro');
       let nDiscos = 0;
+      /*
+       * A pie, el peón y su disco a la talla de quien anda (`tallaDelPeon`, en `anillo-en-3d.ts`): la
+       * ficha grande es una ayuda para leer la mesa desde arriba, y desde la calle sería un monolito.
+       */
+      const tallaPeon = tallaDelPeon(aPie);
+      const encogeDisco = loQueEncogeElDiscoDelPeon(aPie);
       losAsientos.forEach((a, k) => {
         const e = peones.current.get(a.figura.asiento);
         if (mp === null || e === undefined || k >= CAPACIDAD.peones) return;
@@ -2409,10 +2417,10 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
            */
           auxEuler.set((Math.PI / 2) * p.tumbado, 0, 0);
           auxGiro.setFromEuler(auxEuler);
-          mp.setMatrixAt(k, auxMatriz.compose(auxPosicion.set(x, y, p.z), auxGiro, auxEscala.set(TALLA_DEL_PEON, TALLA_DEL_PEON, TALLA_DEL_PEON)));
+          mp.setMatrixAt(k, auxMatriz.compose(auxPosicion.set(x, y, p.z), auxGiro, auxEscala.setScalar(tallaPeon)));
           if (md !== null && nDiscos < CAPACIDAD.discos) {
             auxEuler.set(-Math.PI / 2, 0, 0);
-            md.setMatrixAt(nDiscos, auxMatriz.compose(auxPosicion.set(x, 0.03, p.z), auxGiro.setFromEuler(auxEuler), auxEscala.set(1, 1, 1)));
+            md.setMatrixAt(nDiscos, auxMatriz.compose(auxPosicion.set(x, 0.03, p.z), auxGiro.setFromEuler(auxEuler), auxEscala.set(encogeDisco, encogeDisco, 1)));
             nDiscos++;
           }
         }
@@ -2427,7 +2435,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
           const av = posicionYRumbo(e, anillo, ahora);
           if (av.escala <= 0.01) continue;
           auxEuler.set(-Math.PI / 2, 0, 0);
-          md.setMatrixAt(nDiscos, auxMatriz.compose(auxPosicion.set(av.x, 0.03, av.z), auxGiro.setFromEuler(auxEuler), auxEscala.set(1.1 * av.escala, 1.1 * av.escala, 1)));
+          md.setMatrixAt(nDiscos, auxMatriz.compose(auxPosicion.set(av.x, 0.03, av.z), auxGiro.setFromEuler(auxEuler), auxEscala.set(1.1 * av.escala * encogeDisco, 1.1 * av.escala * encogeDisco, 1)));
           nDiscos++;
         }
       }
@@ -3345,7 +3353,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
 
       {/* El aventurero en pie: uno, y sólo con marioneta. */}
       {plena && asientoEnPie !== null && cargadoEnPie !== undefined && refEnPie !== undefined && biblioteca.length > 0 ? (
-        <Aventurero key={asientoEnPie.figura.asiento} estado={refEnPie} cargado={cargadoEnPie} biblioteca={biblioteca} anillo={anillo} />
+        <Aventurero key={asientoEnPie.figura.asiento} estado={refEnPie} cargado={cargadoEnPie} biblioteca={biblioteca} anillo={anillo} talla={aPie ? TALLA_A_PIE : 1} />
       ) : null}
       {/* Y el ganador en la plaza, en `fin`. */}
       {plena && ganadorEnPlaza && cargadoDelGanador !== undefined && biblioteca.length > 0 ? (

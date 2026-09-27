@@ -114,7 +114,7 @@ import {
   rumboDeRadianes,
   SENO,
   TICS_POR_SEGUNDO,
-  VELOCIDAD_CORRIENDO,
+  VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR,
 } from '../../shared/mecanicas/andar';
 import { aNumero, deNumero, por, UNO } from '../../shared/mecanicas/fijo';
 import { seAndaEnRecta, sePuedeEstar } from '../../shared/mecanicas/mundo';
@@ -471,20 +471,35 @@ export function ticDelPaseo(
 /* ─── Del adorno se sale andando ─────────────────────────────────────────── */
 
 /**
- * LO QUE SE ANDA COMO MUCHO EN UN TIC SALIENDO DEL ADORNO: un tic de correr, 1,32 unidades.
+ * LO QUE SE ANDA COMO MUCHO EN UN TIC SALIENDO DEL ADORNO: un tic de lo más deprisa que el servidor
+ * acepta (`VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR`, 26,4 u/s), 1,32 unidades.
  *
  * Es lo que el servidor acepta siempre a partir de un sitio que él mismo dio: tras un `corrige`, un
  * `dentro` o un `renace`, el primer `aqui` tiene que caer a un tic con holgura de ese sitio
  * (`UN_TIC_CON_HOLGURA`, 1,65 en `server/src/botas/canal.ts`), o se ignora y al segundo se le vuelve a
  * corregir al mismo sitio: dentro del coche otra vez, para siempre.
+ *
+ * Y NO un tic de correr de este aparato, que desde la talla a pie es la mitad (`andar.ts`): a 0,66 por
+ * tic, quien sale de una arboleda hacia la salida que `salidaDelAdorno` eligió —fuera de todo rincón
+ * cerrado— pisaba suelo libre a medio camino y dejaba de salir ahí, que puede ser un bolsillo entre dos
+ * arboledas (medido en `verify:paseo`, en el delta). Es un tramo que el servidor acepta, y es raro.
  */
-export const LO_QUE_SE_SALE_EN_UN_TIC = por(VELOCIDAD_CORRIENDO, DT_DEL_TIC);
+export const LO_QUE_SE_SALE_EN_UN_TIC = por(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, DT_DEL_TIC);
 
 /**
  * EL SITIO LIBRE MÁS CERCANO PARA SALIR DEL ADORNO: el primero, en los anillos de `sitioDondeCabe`,
  * donde se puede estar con estructura y adorno, al que se llega en RECTA por la estructura sola
  * (`seAndaEnRecta`: el tramo que mira el servidor) y que no es un rincón cerrado (`quedaEncerrado`).
  * Si todos los que valen lo son, el primero de ellos; `null` si no hay ninguno a menos de 38 unidades.
+ *
+ * ═══ Y TAMPOCO SE PARA EN UN RINCÓN DE CAMINO ═══
+ *
+ * Se sale a tics de `LO_QUE_SE_SALE_EN_UN_TIC`, y en cuanto se pisa suelo libre se deja de salir: si la
+ * recta hacia una salida lejana cruza un claro cerrado, allí es donde se acaba, no en la salida. Pasó
+ * al encoger a quien anda (27-sep-2026): del tocón de un claro entre dos arboledas del delta, todas
+ * las salidas cercanas eran el propio claro, la primera buena estaba a 14 unidades AL OTRO LADO de
+ * él, y el primer tic caía dentro (`verify:paseo`). Así que de cada salida buena se mira también
+ * dónde se pararía de verdad (`dondeSeParaAlSalir`), y si eso es un rincón cerrado, no vale.
  */
 export function salidaDelAdorno(arena: Arena, estructura: Arena, desde: Andante, radio: number = RADIO_DEL_PASEANTE): Andante | null {
   const paso = radio * 2;
@@ -496,11 +511,30 @@ export function salidaDelAdorno(arena: Arena, estructura: Arena, desde: Andante,
       const cx = desde.x + por(lejos, SENO[r] as number);
       const cz = desde.z - por(lejos, COSENO[r] as number);
       if (!sePuedeEstar(arena, cx, cz, radio) || !seAndaEnRecta(estructura, desde, { x: cx, z: cz }, radio)) continue;
-      if (!quedaEncerrado(arena, cx, cz, radio)) return { x: cx, z: cz };
+      if (!quedaEncerrado(arena, cx, cz, radio)) {
+        const para = dondeSeParaAlSalir(arena, desde, { x: cx, z: cz }, radio);
+        if ((para.x === cx && para.z === cz) || !quedaEncerrado(arena, para.x, para.z, radio)) return { x: cx, z: cz };
+      }
       encerrada ??= { x: cx, z: cz };
     }
   }
   return encerrada;
+}
+
+/**
+ * DÓNDE SE PARA DE VERDAD QUIEN SALE DEL ADORNO HACIA `hasta`: el primer tic de la recta, dado como lo
+ * da `salirDelAdorno`, que pisa suelo libre; `hasta` si ninguno lo pisa antes.
+ */
+function dondeSeParaAlSalir(arena: Arena, desde: Andante, hasta: Andante, radio: number): Andante {
+  const dx = hasta.x - desde.x;
+  const dz = hasta.z - desde.z;
+  const lejos = Math.hypot(dx, dz);
+  for (let andado = LO_QUE_SE_SALE_EN_UN_TIC; andado < lejos; andado += LO_QUE_SE_SALE_EN_UN_TIC) {
+    const f = andado / lejos;
+    const aqui = { x: desde.x + Math.trunc(dx * f), z: desde.z + Math.trunc(dz * f) };
+    if (sePuedeEstar(arena, aqui.x, aqui.z, radio)) return aqui;
+  }
+  return hasta;
 }
 
 /**

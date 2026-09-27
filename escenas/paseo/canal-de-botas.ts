@@ -141,7 +141,7 @@ import type {
   Renace,
   Vidas,
 } from '../../shared/mecanicas/canal-de-botas';
-import { QUIETO, TICS_POR_SEGUNDO, VELOCIDAD_CORRIENDO, radianesDelRumbo } from '../../shared/mecanicas/andar';
+import { QUIETO, TICS_POR_SEGUNDO, VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR, radianesDelRumbo } from '../../shared/mecanicas/andar';
 import { aNumero } from '../../shared/mecanicas/fijo';
 import type { Andante } from '../../shared/mecanicas/mundo';
 import type { EntradaDelTic } from './mandos';
@@ -410,7 +410,12 @@ export function poseEntreFotos(asiento: string, fotos: readonly Muestra[], t: nu
   const dz = b.z - a.z;
   const largo = Math.hypot(dx, dz);
   /* Un salto que no se anda en ese tiempo es una corrección del servidor: no se pinta el camino. */
-  if (largo > aNumero(VELOCIDAD_CORRIENDO) * segundos * VECES_LO_QUE_SE_CORRE) {
+  /*
+   * Con lo más deprisa que el servidor ACEPTA (26,4 u/s) y no con lo que corre este aparato (13,2): el
+   * otro puede llevar la app 1.8.x, anterior a la talla a pie, que corre al doble (`andar.ts`). Con la
+   * velocidad de aquí, cada paso suyo corriendo se leería como una corrección y se le vería a saltos.
+   */
+  if (largo > aNumero(VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR) * segundos * VECES_LO_QUE_SE_CORRE) {
     return { asiento, x: a.x, z: a.z, rumbo: a.rumbo, velocidad: 0 };
   }
   const alfa = (t - a.t) / (b.t - a.t);

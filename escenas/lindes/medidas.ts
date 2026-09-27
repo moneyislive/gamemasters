@@ -64,7 +64,7 @@
  * Aquí se quedan las que son sólo de PINTAR: el grueso del cartón, el presupuesto de
  * triángulos y el labriego.
  */
-import { ALTURA_DE_UNA_PERSONA } from '../escala';
+import { ALTURA_DE_QUIEN_ANDA } from '../paseo/talla';
 import { LADO_DE_LOSA } from '../../shared/arcade/juegos/lindes-medidas';
 
 export {
@@ -201,9 +201,13 @@ export function loQueSeLevantaLaUltima(aPie: boolean): number {
  * Así que no se cambia la decisión: se parte en dos. Ficha en la mesa, hombre a pie, con
  * la altura EXACTA del aventurero que anda a su lado. Y no es un apaño de tamaño: un
  * labriego es, literalmente, un hombre en un campo.
+ *
+ * La del aventurero que anda, `ALTURA_DE_QUIEN_ANDA` (`paseo/talla.ts`), y no la persona del
+ * mundo: desde el 27-sep-2026 quien anda mide la mitad, y un labriego a la vara del mundo le
+ * sacaría una cabeza entera al jugador que pasa a su lado.
  */
 export function loQueEncogeElLabriego(aPie: boolean): number {
-  return aPie ? ALTURA_DE_UNA_PERSONA / ALTO_DEL_LABRIEGO : 1;
+  return aPie ? ALTURA_DE_QUIEN_ANDA / ALTO_DEL_LABRIEGO : 1;
 }
 
 /** Cuánto sobresale del suelo la peana de un labriego. */

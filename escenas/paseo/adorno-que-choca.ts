@@ -26,9 +26,10 @@
  *   · un BANCO, una PAPELERA o un COCHE, enteros; una lámina, una alfombra o un paso de cebra, que
  *     no llegan a `LO_QUE_SE_PISA`, no: se pisan.
  *
- * `LO_QUE_SE_PISA` es el 12 % de quien anda, 0,305 unidades: el tobillo. Lo decidido es «lo que no
- * pasa del tobillo se pisa»; medido en el Burgo, deja fuera los palets (0,30) y dentro la papelera
- * (0,31). Y una rodaja cuya planta no llega a `HUELLA_DESPRECIABLE` por ningún lado (un cable, una
+ * `LO_QUE_SE_PISA` es el 12 % de quien anda: el tobillo. Lo decidido es «lo que no pasa del tobillo
+ * se pisa». Con quien anda a su talla de antes eran 0,305 unidades, y dejaban fuera los palets del
+ * Burgo (0,30); desde que mide la mitad (`talla.ts`) son 0,153, y un palet, que ya le llega a la
+ * rodilla, choca como choca la papelera (0,31). Y una rodaja cuya planta no llega a `HUELLA_DESPRECIABLE` por ningún lado (un cable, una
  * varilla de 5 cm) no cuenta: con el radio de quien anda se convertiría en una pared de 0,8 donde no
  * se ve nada.
  *

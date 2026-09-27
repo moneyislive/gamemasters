@@ -199,6 +199,7 @@ import { medioLado, sitioDeCasilla as sitioEnElAnillo, casillasDelAnillo } from 
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { sorteo } from '../embarcadero/cala';
 import { ALTO_DE_LA_LETRA, AVANCE_DE_LA_LETRA } from '../iconos';
+import { ALTURA_DE_QUIEN_ANDA } from '../paseo/talla';
 import { PIEZA, RETICULA_DE_LA_CIUDAD } from './piezas';
 import type { NombreDePieza } from './piezas';
 
@@ -1162,6 +1163,27 @@ export const ALTO_DEL_PEON = ALTO_DEL_PEON_EN_EL_PACK * TALLA_DEL_PEON; // 6,171
  * anotado con el resto de lo que el peón grande deja abierto en §13.5 de `docs/burgo/DISENO-3.md`.
  */
 export const RADIO_DEL_DISCO_DEL_PEON = (DIAMETRO_DEL_PEON / 2) * 1.1; // 1,85625
+
+/**
+ * LO QUE MIDE EL PEÓN SEGÚN DESDE DÓNDE SE MIRE: ficha desde la mesa, persona a pie.
+ *
+ * ═══ EL TABLERO SE MIRA DESDE DOS DISTANCIAS ═══
+ *
+ * `TALLA_DEL_PEON` es la de la MESA: todo lo de arriba lo explica, y desde la mesa sigue siendo
+ * verdad. Pero el anillo se ANDA —hay sitios de renacer en él, y se cruza para ir de una calle a
+ * otra— y a pie esa misma ficha es un monolito de 6,17 al lado de un jugador que desde el
+ * 27-sep-2026 mide 1,27 (`ALTURA_DE_QUIEN_ANDA`, `paseo/talla.ts`): casi cinco veces él. Es el caso
+ * de `loQueEncogeElLabriego` en Las Lindes, y se resuelve igual: la ayuda de lectura se queda en la
+ * mesa y a pie el peón mide lo que quien anda.
+ */
+export function tallaDelPeon(aPie: boolean): number {
+  return aPie ? ALTURA_DE_QUIEN_ANDA / ALTO_DEL_PEON_EN_EL_PACK : TALLA_DEL_PEON;
+}
+
+/** Y su disco de contacto encoge con él: cuántas veces el de la mesa (`RADIO_DEL_DISCO_DEL_PEON`). */
+export function loQueEncogeElDiscoDelPeon(aPie: boolean): number {
+  return tallaDelPeon(aPie) / TALLA_DEL_PEON;
+}
 
 /**
  * LA CASA: LA MITAD DEL FONDO DE LA FRANJA DEL BARRIO.

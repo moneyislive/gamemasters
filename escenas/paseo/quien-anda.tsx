@@ -59,6 +59,7 @@ import { giroDeLaMarioneta } from './camaras';
 import type { ClienteDelCanal } from './canal-de-botas';
 import type { ComoVaEnLaRefriega } from './refriega';
 import { ALTURA_DEL_ROTULO, altoDelRotulo, geometriaDeLosCorazones, ponerLosCorazones } from './rotulo';
+import { TALLA_A_PIE } from './talla';
 import { clipDelPaso, ritmoDelClip } from './zancada';
 
 /**
@@ -139,6 +140,15 @@ export function mueveAQuienAnda(
   /* Intocable, parpadea: ver `refriega.ts`. */
   g.visible = como === null || como.seVe;
   g.position.set(quien.x, y, quien.z);
+  /*
+   * ═══ A SU TALLA A PIE, NO A LA DE SERIE ═══
+   *
+   * La figura de KayKit mide una persona del mundo (2,543), y a pie se pinta a `TALLA_A_PIE` de eso
+   * (`talla.ts`, con las medidas que lo decidieron en `shared/mecanicas/talla.ts`). Se escala el
+   * grupo y no la raíz de la marioneta: el mezclador mueve huesos, no escalas, y así la misma
+   * marioneta montada sirve en el Muelle a su tamaño de siempre.
+   */
+  g.scale.setScalar(TALLA_A_PIE);
 
   /*
    * ═══ EL RUMBO SE ALCANZA, NO SE COPIA ═══

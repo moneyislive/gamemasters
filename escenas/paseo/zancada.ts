@@ -43,12 +43,17 @@ import type { NombreDeClip } from '../embarcadero/figuras';
 import { VELOCIDAD_DE_CARRERA, VELOCIDAD_DE_PASEO } from '../plaza/gestos-de-la-plaza';
 import { VELOCIDAD_ANDANDO, VELOCIDAD_CORRIENDO } from '../../shared/mecanicas/andar';
 import { aNumero } from '../../shared/mecanicas/fijo';
+import { TALLA_A_PIE } from './talla';
 
-/** Lo que cubre `andar` a velocidad 1, en unidades por segundo. Medido: `gestos-de-la-plaza.ts`. */
-export const ZANCADA_DE_ANDAR = VELOCIDAD_DE_PASEO;
+/**
+ * Lo que cubre `andar` a velocidad 1, en unidades por segundo. Medido a la talla de serie de la figura
+ * (`gestos-de-la-plaza.ts`), y a pie la figura va a `TALLA_A_PIE` (`talla.ts`): sus piernas miden eso
+ * y su zancada también. Sin multiplicarla, una figura de la mitad patinaría el doble de lo que anda.
+ */
+export const ZANCADA_DE_ANDAR = VELOCIDAD_DE_PASEO * TALLA_A_PIE;
 
-/** Y `correr`, el doble. Medido igual. */
-export const ZANCADA_DE_CORRER = VELOCIDAD_DE_CARRERA;
+/** Y `correr`, el doble. Medido igual, y a la misma talla. */
+export const ZANCADA_DE_CORRER = VELOCIDAD_DE_CARRERA * TALLA_A_PIE;
 
 /**
  * POR DEBAJO DE ESTO ESTÁ QUIETO, en unidades por segundo.
@@ -61,7 +66,7 @@ export const QUIETO_POR_DEBAJO_DE = ZANCADA_DE_ANDAR / 8;
 
 /**
  * A PARTIR DE AQUÍ CORRE: a medio camino entre la velocidad de andar y la de correr del paso por
- * tics, 12 y 26,4. Salen de `andar.ts` y no se escriben aquí, para que el día que cambien el
+ * tics, 6 y 13,2. Salen de `andar.ts` y no se escriben aquí, para que el día que cambien el
  * umbral siga cayendo en medio.
  */
 export const CORRE_A_PARTIR_DE = (aNumero(VELOCIDAD_ANDANDO) + aNumero(VELOCIDAD_CORRIENDO)) / 2;

@@ -79,6 +79,7 @@ import {
 } from '../../shared/arcade/juegos/riberas';
 import { semillaDelCodigo } from '../../shared/mecanicas/semilla';
 import { RADIO_DEL_LANZAMIENTO, REBOBINADO_MS, seAndaElTramo, UN_TIC_CON_HOLGURA } from '../src/botas/canal';
+import { ALCANCE_DEL_GOLPE as ALCANCE_DE_LOS_PUNOS } from '../../shared/mecanicas/canal-de-botas';
 
 const REPO = path.resolve(import.meta.dirname ?? __dirname, '..', '..');
 const TSX = path.join(REPO, 'node_modules', 'tsx', 'dist', 'cli.mjs');
@@ -754,11 +755,28 @@ async function jugarPorLaApi(juego: JuegoDeLaRefriega, codigo: string, sentados:
 /**
  * LOS DOS SE ENCUENTRAN A MEDIO CAMINO: un camino de uno al otro sobre el mundo de la mesa, y cada
  * uno anda su mitad, a la vez, un punto cada 55 ms —veintiséis unidades por segundo en diagonal, por
- * debajo de lo que el presupuesto deja correr—. Acaban en dos puntos seguidos del camino: a menos de
- * un paso y con la recta libre entre ellos. `false` si no hay camino.
+ * debajo de lo que el presupuesto deja correr—. Acaban en dos puntos seguidos del camino, con la recta
+ * libre entre ellos, y el segundo se arrima al primero hasta que queda a mano: a `A_MANO`, dentro del
+ * alcance del golpe, que desde la talla a pie (`shared/mecanicas/talla.ts`) es de 1,25 y más corto que
+ * un paso del camino en diagonal. `false` si no hay camino.
  */
+const A_MANO = deNumero(ALCANCE_DE_LOS_PUNOS * 0.8);
+
+/** Arrima `b` a `a` en recta, a medio paso por vez, hasta dejarlo a `A_MANO`. */
+async function arrimar(arena: Arena, a: Aparato, b: Aparato): Promise<void> {
+  for (let i = 0; i < 20; i++) {
+    const d = Math.hypot(a.x - b.x, a.z - b.z);
+    if (d <= A_MANO || !seAndaEnRecta(arena, a, b, RADIO_DEL_PASEANTE)) return;
+    const tramo = Math.min(deNumero(0.5), d - A_MANO + 1);
+    await dormir(55);
+    b.x += Math.round(((a.x - b.x) / d) * tramo);
+    b.z += Math.round(((a.z - b.z) / d) * tramo);
+    b.aqui(b.x, b.z, 0, 1);
+  }
+}
+
 async function encontrarse(arena: Arena, a: Aparato, b: Aparato): Promise<boolean> {
-  if (Math.hypot(b.x - a.x, b.z - a.z) <= deNumero(2) && seAndaEnRecta(arena, a, b, RADIO_DEL_LANZAMIENTO)) return true;
+  if (Math.hypot(b.x - a.x, b.z - a.z) <= A_MANO && seAndaEnRecta(arena, a, b, RADIO_DEL_LANZAMIENTO)) return true;
   const ruta = caminoLargo(arena, { x: a.x, z: a.z }, { x: b.x, z: b.z });
   if (ruta === null) return false;
   const todo = [{ x: a.x, z: a.z }, ...ruta];
@@ -780,6 +798,7 @@ async function encontrarse(arena: Arena, a: Aparato, b: Aparato): Promise<boolea
       b.aqui(b.x, b.z, 0, 2);
     }
   }
+  await arrimar(arena, a, b);
   return true;
 }
 

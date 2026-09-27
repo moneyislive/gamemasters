@@ -56,16 +56,36 @@ import { RADIO_DEL_PASEANTE } from '../../shared/mecanicas/andar';
 import { aNumero, deNumero } from '../../shared/mecanicas/fijo';
 import { sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena } from '../../shared/mecanicas/mundo';
-import { ALTURA_DE_UNA_PERSONA } from '../escala';
 import { tapaLaVista } from './estorbos';
 import type { EstorbosDelPaseo } from './estorbos';
+import { ALTURA_DE_QUIEN_ANDA } from './talla';
+
+/**
+ * ═══ TODO VA EN ALTURAS DE QUIEN ANDA, NO DE LA PERSONA DEL MUNDO ═══
+ *
+ * Los ojos, el hombro, lo que se mira delante y lo que hay que ver cuelgan de
+ * `ALTURA_DE_QUIEN_ANDA` (`talla.ts`). Estaban en `ALTURA_DE_UNA_PERSONA`, la vara del mundo, y el
+ * 27-sep-2026 quien anda pasó a medir la mitad: con la vara del mundo, la cámara de hombro se habría
+ * quedado a seis unidades y media de una figura de 1,27 —un muñeco en medio del encuadre— y la de
+ * ojos a la altura de la coronilla de un gigante que ya no está. Con todo en la misma talla el
+ * encuadre es el de siempre, con la figura a su tamaño contra lo que la rodea, que es lo que se pidió.
+ */
 
 /** A qué altura van los ojos sobre el suelo que se pisa. */
-export const ALTURA_DE_LOS_OJOS = ALTURA_DE_UNA_PERSONA * 0.92;
+export const ALTURA_DE_LOS_OJOS = ALTURA_DE_QUIEN_ANDA * 0.92;
 
 /** Cuánto se queda la cámara de hombro por detrás y por encima del suelo que se pisa. */
-export const ATRAS_DEL_HOMBRO = ALTURA_DE_UNA_PERSONA * 2.6;
-export const SOBRE_EL_HOMBRO = ALTURA_DE_UNA_PERSONA * 1.5;
+export const ATRAS_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 2.6;
+export const SOBRE_EL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 1.5;
+
+/**
+ * Hacia dónde miran, por delante: la de ojos a cuatro alturas —casi recto, un pelo hacia abajo— y la
+ * de hombro a dos y media, que es lo que la inclina hacia la nuca. En alturas de quien anda por lo
+ * mismo que todo lo demás: con unidades fijas, al encoger la figura la cámara de hombro miraría más
+ * lejos y más plana y la dejaría en el borde de abajo del encuadre.
+ */
+export const DELANTE_DE_LOS_OJOS = ALTURA_DE_QUIEN_ANDA * (10 / 2.543);
+export const DELANTE_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * (6 / 2.543);
 
 /** Dónde va la cámara y hacia dónde mira. */
 export interface PoseDeCamara {
@@ -116,9 +136,9 @@ export function camaraDeOjos(quien: QuienSeMira, suelo = 0): PoseDeCamara {
     x: quien.x,
     y: suelo + ALTURA_DE_LOS_OJOS,
     z: quien.z,
-    miraX: quien.x + Math.sin(quien.rumbo) * 10,
+    miraX: quien.x + Math.sin(quien.rumbo) * DELANTE_DE_LOS_OJOS,
     miraY: suelo + ALTURA_DE_LOS_OJOS * 0.85,
-    miraZ: quien.z - Math.cos(quien.rumbo) * 10,
+    miraZ: quien.z - Math.cos(quien.rumbo) * DELANTE_DE_LOS_OJOS,
   };
 }
 
@@ -131,16 +151,17 @@ export function camaraDeHombro(quien: QuienSeMira, suelo = 0, atras = ATRAS_DEL_
     x: quien.x - Math.sin(quien.rumbo) * atras,
     y: suelo + SOBRE_EL_HOMBRO,
     z: quien.z + Math.cos(quien.rumbo) * atras,
-    miraX: quien.x + Math.sin(quien.rumbo) * 6,
-    miraY: suelo + ALTURA_DE_UNA_PERSONA * 0.6,
-    miraZ: quien.z - Math.cos(quien.rumbo) * 6,
+    miraX: quien.x + Math.sin(quien.rumbo) * DELANTE_DEL_HOMBRO,
+    miraY: suelo + ALTURA_DE_QUIEN_ANDA * 0.6,
+    miraZ: quien.z - Math.cos(quien.rumbo) * DELANTE_DEL_HOMBRO,
   };
 }
 
 /* ─── La cámara de hombro que no atraviesa ───────────────────────────────── */
 
 /**
- * LO MÁS CERCA QUE SE PONE LA CÁMARA DE HOMBRO: media persona.
+ * LO MÁS CERCA QUE SE PONE LA CÁMARA DE HOMBRO: media altura de quien anda (0,64 desde que mide la
+ * mitad; ver la cabecera).
  *
  * Pegado de espaldas a una pared, el centro de quien pasea queda a un radio de ella (0,4) y ahí no
  * cabe ninguna cámara de hombro. Por debajo de esto la cámara estaría encima de la cabeza y se
@@ -148,7 +169,7 @@ export function camaraDeHombro(quien: QuienSeMira, suelo = 0, atras = ATRAS_DEL_
  * más corto, la cámara se queda aquí y lo que tiene detrás cae dentro del plano cercano (a una
  * unidad en los dos clientes), así que no tapa: es la única concesión, y es de un palmo.
  */
-export const ATRAS_MINIMO_DEL_HOMBRO = ALTURA_DE_UNA_PERSONA * 0.5;
+export const ATRAS_MINIMO_DEL_HOMBRO = ALTURA_DE_QUIEN_ANDA * 0.5;
 
 /**
  * EL RADIO DE LA CÁMARA, en Q16.16: el del paseante. Es lo que tiene que caber el ojo, con su plano
@@ -206,7 +227,7 @@ export function hastaDondeCabeElHombro(arena: Arena, quien: QuienSeMira, lejos =
  * cuello. Es lo que hay que ver para saber dónde está y hacia dónde va; los pies se pueden perder
  * detrás de un banco sin que se pierda nada.
  */
-export const LO_QUE_HAY_QUE_VER = ALTURA_DE_UNA_PERSONA * 0.7;
+export const LO_QUE_HAY_QUE_VER = ALTURA_DE_QUIEN_ANDA * 0.7;
 
 /** Cada cuánto se prueba la cámara a lo largo de su carril, en unidades del mundo. */
 export const PASO_DEL_CARRIL = 0.25;

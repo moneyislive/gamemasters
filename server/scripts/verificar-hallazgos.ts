@@ -18,7 +18,7 @@
  *      la mesa decide, quien llega después no se lo lleva; el tope por mesa con ocho corriendo; y el
  *      mundo que cambia debajo de un brote.
  *   3. LAS ARMAS: los puños son EXACTAMENTE los números de antes; el hacha quita 2 y la vida no baja
- *      de cero; la honda llega a 6 u pero no fuera de su cono de 20°; los puños no llegan a 4 u; el
+ *      de cero; la honda llega a 3 u pero no fuera de su cono de 20°; los puños no llegan a 2 u; el
  *      arma se lee una vez por revisión y cambia cuando cambia la vista.
  *   4. CON LA MESA DE VERDAD: `meterElHallazgoDeVerdad` mete `arcade:hallazgo` en una mesa `botas`
  *      del Burgo por la vía interna, en nombre de nadie, y queda en el diario.
@@ -40,6 +40,14 @@ import {
 import type { MensajeDelServidor } from '../../shared/mecanicas/canal-de-botas';
 import { RADIO_DEL_PASEANTE, rumboDeRadianes } from '../../shared/mecanicas/andar';
 import { deNumero, UNO } from '../../shared/mecanicas/fijo';
+import { TALLA_A_PIE } from '../../shared/mecanicas/talla';
+
+/*
+ * LAS DISTANCIAS VAN CON LA TALLA A PIE (`shared/mecanicas/talla.ts`): estas pruebas se escribieron con
+ * un cuerpo de 2,543, recogiendo a 1,5 y con la honda a 6; desde el 27-sep-2026 todo eso es la mitad, y
+ * los sitios de prueba van multiplicados por `T`.
+ */
+const T = TALLA_A_PIE;
 import { arenaDe, sePuedeEstar } from '../../shared/mecanicas/mundo';
 import type { Arena, MundoDeclarado } from '../../shared/mecanicas/mundo';
 import {
@@ -285,7 +293,7 @@ function ruedo(): MundoDeclarado {
     cuerpos: [],
     nace: [
       { x: 0, z: 0, rumbo: 0 },
-      { x: 0, z: -2, rumbo: Math.PI },
+      { x: 0, z: -2 * T, rumbo: Math.PI },
       { x: 60, z: 0, rumbo: 0 },
     ],
   };
@@ -392,10 +400,10 @@ function distanciaAlTramo(p: Punto, a: Punto, b: Punto): number {
   return Math.hypot(a.x + t * dx - p.x, a.z + t * dz - p.z);
 }
 
-const LEJOS_DEL_BROTE = deNumero(2.2);
+const LEJOS_DEL_BROTE = deNumero(2.2 * T);
 
 /**
- * Lleva a alguien hasta `(x, z)` SIN PASAR a menos de 2,2 u de `evitar`: en recta si se puede, y si
+ * Lleva a alguien hasta `(x, z)` SIN PASAR a menos de 1,1 u de `evitar`: en recta si se puede, y si
  * no, por un sitio de paso que lo rodee. `true` si llega.
  */
 async function irEsquivando(reloj: RelojDeMentira, arena: Arena, d: Dentro, x: number, z: number, evitar: Punto): Promise<boolean> {
@@ -511,16 +519,19 @@ paso('La lista de brotes, sola: sitios, siembra, ids, pesos, radio, cadena y are
   const nuevo = lista.lista().find((b) => !brotados.some((v) => v.id === b.id));
   comprobar('el que vuelve a brotar lleva un id nuevo, mayor que todos', nuevo !== undefined && nuevo.id === 7, nuevo);
 
-  /* EL RADIO, en el borde exacto: 1,5 u es 98.304 en Q16.16. */
+  /* EL RADIO, en el borde exacto: 0,75 u (1,5 a la talla de antes) es 49.152 en Q16.16. */
   const b = lista.lista()[0];
   if (b === undefined) comprobar('hay un brote para medir el radio', false);
   else {
     const radio = RADIO_DE_RECOGER * U;
-    comprobar('a 1,5 u justas, al alcance', lista.alAlcance(b.x + radio, b.z)?.id === b.id);
-    comprobar('a 1,5 u y un pelo, no', lista.alAlcance(b.x + radio + 1, b.z) === null || lista.alAlcance(b.x + radio + 1, b.z)?.id !== b.id);
+    const r = RADIO_DE_RECOGER.toFixed(2);
+    comprobar(`a ${r} u justas, al alcance`, lista.alAlcance(b.x + radio, b.z)?.id === b.id);
+    comprobar(`a ${r} u y un pelo, no`, lista.alAlcance(b.x + radio + 1, b.z) === null || lista.alAlcance(b.x + radio + 1, b.z)?.id !== b.id);
     comprobar('encima, al alcance', lista.alAlcance(b.x, b.z)?.id === b.id);
-    comprobar('en diagonal dentro del radio, al alcance', lista.alAlcance(b.x + 69000, b.z - 69000)?.id === b.id);
-    comprobar('en diagonal a 1,5 u por eje (2,12 u), no', lista.alAlcance(b.x + radio, b.z + radio)?.id !== b.id);
+    /* A 0,7 del radio por eje: 0,99 del radio en diagonal. */
+    const porEje = Math.round(radio * 0.7);
+    comprobar('en diagonal dentro del radio, al alcance', lista.alAlcance(b.x + porEje, b.z - porEje)?.id === b.id);
+    comprobar(`en diagonal a ${r} u por eje (${(RADIO_DE_RECOGER * Math.SQRT2).toFixed(2)} u), no`, lista.alAlcance(b.x + radio, b.z + radio)?.id !== b.id);
   }
 
   /* LOS PESOS: 3 a 1, en cuatro mil siembras. */
@@ -643,12 +654,12 @@ paso('Se recoge al pasar: `recoge` y `brotes` a toda la sala, y el hallazgo a la
   if (objetivo === undefined) comprobar('hay un brote al que ir', false);
   else {
     /*
-     * PASAR, NO PARARSE: a una unidad de él, de lado, y seguir cinco más en la misma dirección. Se
+     * PASAR, NO PARARSE: a media unidad de él (una a la talla de antes), de lado, y seguir en la misma dirección. Se
      * llega al punto de al lado esquivándolo, y luego se cruza.
      */
     const [id, clase, bx, bz] = objetivo;
-    const lado = sePuedeEstar(ARENA_DEL_CAMPO, bx + deNumero(1), bz + deNumero(3), RADIO_DEL_PASEANTE) ? 1 : -1;
-    const desde = { x: bx + deNumero(1), z: bz + lado * deNumero(3) };
+    const lado = sePuedeEstar(ARENA_DEL_CAMPO, bx + deNumero(1 * T), bz + deNumero(3), RADIO_DEL_PASEANTE) ? 1 : -1;
+    const desde = { x: bx + deNumero(1 * T), z: bz + lado * deNumero(3) };
     const llego = await irEsquivando(reloj, ARENA_DEL_CAMPO, a, desde.x, desde.z, { x: bx, z: bz });
     comprobar('se llega a un lado del brote sin haberlo recogido', llego && brotesQueVe(a).some((e) => e[0] === id), { llego });
     const recogesAntes = recogesDe(a);
@@ -658,7 +669,7 @@ paso('Se recoge al pasar: `recoge` y `brotes` a toda la sala, y el hallazgo a la
     const pedidosAntes2 = HALLAZGOS_PEDIDOS.length;
     /* Cruzando, un paso por tic; se apunta CUÁNDO se recoge, que es desde cuando cuenta el rebrote. */
     let recogidoEn: number | null = null;
-    const hastaX = bx + deNumero(1);
+    const hastaX = bx + deNumero(1 * T);
     const hastaZ = bz - lado * deNumero(3);
     for (let i = 0; i < 200 && (a.x !== hastaX || a.z !== hastaZ); i++) {
       await reloj.avanzar(50);
@@ -668,7 +679,7 @@ paso('Se recoge al pasar: `recoge` y `brotes` a toda la sala, y el hallazgo a la
     await vaciar();
     if (recogidoEn === null && recogesDe(a) > recogesAntes) recogidoEn = reloj.t;
     const suyo = a.enchufe.de('recoge').find((r) => r.h === id);
-    comprobar('al pasar a una unidad, se recoge: `recoge` con su id, quién y la clase', suyo !== undefined && suyo.por === 'a-uno' && suyo.clase === clase, a.enchufe.de('recoge'));
+    comprobar('al pasar a media unidad, se recoge: `recoge` con su id, quién y la clase', suyo !== undefined && suyo.por === 'a-uno' && suyo.clase === clase, a.enchufe.de('recoge'));
     comprobar('y ninguno más por el camino que el que se cruzó', recogesDe(a) === recogesAntes + 1, recogesDe(a) - recogesAntes);
     const deB = b.enchufe.mensajes().slice(textosDeBAntes).filter((x) => x !== null && (x.t === 'recoge' || x.t === 'brotes'));
     comprobar(
@@ -882,21 +893,21 @@ paso('Mientras la mesa decide, el brote está apartado: quien llega después no 
   if (brote === undefined) comprobar('hay un brote', false);
   else {
     const [id, , bx, bz] = brote;
-    const signo = sePuedeEstar(ARENA_DEL_CAMPO, bx + deNumero(2.2), bz, RADIO_DEL_PASEANTE) ? 1 : -1;
-    const llegaA = await irEsquivando(reloj, ARENA_DEL_CAMPO, a, bx + signo * deNumero(2.2), bz, { x: bx, z: bz });
-    const llegaB = await irEsquivando(reloj, ARENA_DEL_CAMPO, b, bx, bz - signo * deNumero(2.2), { x: bx, z: bz });
+    const signo = sePuedeEstar(ARENA_DEL_CAMPO, bx + deNumero(2.2 * T), bz, RADIO_DEL_PASEANTE) ? 1 : -1;
+    const llegaA = await irEsquivando(reloj, ARENA_DEL_CAMPO, a, bx + signo * deNumero(2.2 * T), bz, { x: bx, z: bz });
+    const llegaB = await irEsquivando(reloj, ARENA_DEL_CAMPO, b, bx, bz - signo * deNumero(2.2 * T), { x: bx, z: bz });
     await vaciar();
-    comprobar('los dos a 2,2 u del brote, sin haberlo tocado', llegaA && llegaB && brotesQueVe(a).some((e) => e[0] === id), { llegaA, llegaB });
+    comprobar('los dos a 1,1 u del brote, sin haberlo tocado', llegaA && llegaB && brotesQueVe(a).some((e) => e[0] === id), { llegaA, llegaB });
     mesa.respuesta = 'colgada';
     COLGADAS.length = 0;
     const pedidos0 = HALLAZGOS_PEDIDOS.length;
     await reloj.avanzar(50);
-    paso3(a, bx + signo * deNumero(1), bz);
+    paso3(a, bx + signo * deNumero(1 * T), bz);
     await vaciar();
     comprobar('llega el primero: UNA petición a la mesa, colgada', HALLAZGOS_PEDIDOS.length === pedidos0 + 1 && COLGADAS.length === 1, HALLAZGOS_PEDIDOS.length - pedidos0);
     comprobar('y el brote sigue a la vista de todos', brotesQueVe(b).some((e) => e[0] === id) && recogesDe(b) === 0);
     await reloj.avanzar(50);
-    paso3(b, bx, bz - signo * deNumero(1));
+    paso3(b, bx, bz - signo * deNumero(1 * T));
     await reloj.avanzar(50);
     paso3(b, bx, bz);
     await vaciar();
@@ -1047,7 +1058,7 @@ paso('Las armas: los puños de siempre, el hacha, la honda y su cono, y una lect
     canal.apagar();
   }
 
-  /* LA HONDA: llega a 6 u, no a 6,5, y no fuera de su cono de 20°; y la revisión nueva cambia el arma. */
+  /* LA HONDA: llega a 3 u, no a 3,25, y no fuera de su cono de 20°; y la revisión nueva cambia el arma. */
   {
     const { canal, reloj } = canalNuevo();
     const m = mesaNueva({ arcade: 'riberas', mundo: ruedo(), asientos: ['r-uno', 'r-dos'], armas: { 'r-uno': 'honda' } });
@@ -1063,15 +1074,15 @@ paso('Las armas: los puños de siempre, el hacha, la honda y su cono, y una lect
       return daA() > antes;
     };
 
-    comprobar('con honda, a 5,5 u delante: da', await probar(0, -5.5, 0));
-    comprobar('a 6 u justas: da', await probar(0, -6, 0));
-    comprobar('a 6,5 u: no llega', !(await probar(0, -6.5, 0)));
+    comprobar('con honda, a 2,75 u delante: da', await probar(0, -5.5 * T, 0));
+    comprobar('a 3 u justas: da', await probar(0, -6 * T, 0));
+    comprobar('a 3,25 u: no llega', !(await probar(0, -6.5 * T, 0)));
     const lejosLanza = a.enchufe.de('lanza').length;
     comprobar('(los golpes que no dan se lanzan igual)', lejosLanza >= 3, lejosLanza);
-    /* A 5,5 u pero 30° a un lado: fuera de los 20° de la honda. Mirando hacia él, dentro. */
-    const x30 = 5.5 * Math.sin(Math.PI / 6);
-    const z30 = -5.5 * Math.cos(Math.PI / 6);
-    comprobar('a 5,5 u y 30° de la mirada: fuera del cono', !(await probar(x30, z30, 0)));
+    /* A 2,75 u pero 30° a un lado: fuera de los 20° de la honda. Mirando hacia él, dentro. */
+    const x30 = 5.5 * T * Math.sin(Math.PI / 6);
+    const z30 = -5.5 * T * Math.cos(Math.PI / 6);
+    comprobar('a 2,75 u y 30° de la mirada: fuera del cono', !(await probar(x30, z30, 0)));
     comprobar(
       'mirándole de frente, dentro',
       await probar(x30, z30, rumboHacia({ x: 0, z: 0 }, { x: deNumero(x30), z: deNumero(z30) })),
@@ -1087,15 +1098,15 @@ paso('Las armas: los puños de siempre, el hacha, la honda y su cono, y una lect
     }
     await reloj.avanzar(3000 + 5000); /* revisar, derivar, y que b renazca */
     const lecturas = lecturasDeArma;
-    /* B renace donde sea: se le trae a 4 u delante de A. */
+    /* B renace donde sea: se le trae a 2 u delante de A. */
     const renacio = b.enchufe.de('renace').some((r) => r.a === 'r-dos');
     comprobar('(b ha renacido)', renacio);
     b.x = b.enchufe.ultimo('renace')?.x ?? b.x;
     b.z = b.enchufe.ultimo('renace')?.z ?? b.z;
     await reloj.avanzar(2100); /* que pase lo intocable */
-    comprobar('sin honda, a 4 u con los puños: no llega', !(await probar(0, -4, 0)));
+    comprobar('sin honda, a 2 u con los puños: no llega', !(await probar(0, -4 * T, 0)));
     comprobar('la revisión nueva ha hecho leer el arma otra vez', lecturasDeArma === lecturas + 1, { lecturasDeArma, lecturas });
-    comprobar('a 2,4 u con los puños: da uno', await probar(0, -2.4, 0));
+    comprobar('a 1,2 u con los puños: da uno', await probar(0, -2.4 * T, 0));
     comprobar('y quita uno', b.enchufe.ultimo('da')?.vida === VIDA_ENTERA - 1, b.enchufe.ultimo('da'));
     canal.apagar();
   }
@@ -1193,6 +1204,6 @@ console.log(
     '  estar y lejos de todos, se recogen al pasar con `recoge` y `brotes` a toda la sala y el movimiento a la\n' +
     '  mesa —y si la mesa no lo quiere, o aún no ha contestado, el brote se queda—, rebrotan con id nuevo,\n' +
     '  los topes por asiento y por mesa, sin canal y caído no se recoge, y el mundo que cambia los recoloca; y las armas: los puños de siempre, el hacha quita dos, la honda llega a\n' +
-    '  6 u dentro de su cono, y el arma se lee una vez por revisión.',
+    '  3 u dentro de su cono, y el arma se lee una vez por revisión.',
 );
 process.exit(0);

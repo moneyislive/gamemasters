@@ -385,6 +385,26 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
     corregirAQuienPasea.current = paseo.corregir;
   }, [paseo.corregir]);
 
+  /*
+   * ═══ A PIE, EL PLANO CERCANO A MEDIA UNIDAD ═══
+   *
+   * El lienzo del valle lo pone a una unidad (`EL_LIENZO_DEL_VALLE`), que desde la mesa sobra. A pie,
+   * desde que quien anda mide la mitad (`paseo/talla.ts`), la cámara de hombro pegada a una pared se
+   * queda a 0,64 de su espalda (`ATRAS_MINIMO_DEL_HOMBRO`) y la cabeza caía dentro de esa unidad: se
+   * cortaba. Media unidad, como el Burgo y Riberas; al subir a la mesa vuelve la de antes.
+   */
+  useEffect(() => {
+    const c = camera as THREE.PerspectiveCamera;
+    if (!aPie || c.isPerspectiveCamera !== true) return undefined;
+    const cercaDeLaMesa = c.near;
+    c.near = Math.min(cercaDeLaMesa, 0.5);
+    c.updateProjectionMatrix();
+    return () => {
+      c.near = cercaDeLaMesa;
+      c.updateProjectionMatrix();
+    };
+  }, [aPie, camera]);
+
   useFrame((_, dt) => {
     if (camara.modo === 'mesa') {
       const pose = camaraDeMesa(abarca, size.width / Math.max(1, size.height));

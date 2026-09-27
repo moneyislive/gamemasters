@@ -90,11 +90,11 @@ cargado).
 
 | arma | receta | daño | alcance | cono (medio) |
 |---|---|---|---|---|
-| (puños) | — | 1 | 2,5 | 45° |
-| **honda** | 2 cuero + 1 pedernal | 1 | 6 | 20° |
-| **lanza** | 2 junco + 1 hierro | 1 | 4 | 30° |
-| **hacha** | 2 hierro + 1 cuero | 2 | 2,5 | 45° |
-| **maza** | 2 pedernal + 1 junco | 2 | 2 | 60° |
+| (puños) | — | 1 | 1,25 | 45° |
+| **honda** | 2 cuero + 1 pedernal | 1 | 3 | 20° |
+| **lanza** | 2 junco + 1 hierro | 1 | 2 | 30° |
+| **hacha** | 2 hierro + 1 cuero | 2 | 1,25 | 45° |
+| **maza** | 2 pedernal + 1 junco | 2 | 1 | 60° |
 
 `riberas:forjar {arma}` lo manda el colono, cuando quiera mientras la partida se juega (no hace
 falta que sea su turno: la refriega no espera a los turnos). Se lleva UN arma; forjar otra
@@ -141,6 +141,19 @@ La leva se pide cuando se quiera mientras la partida se juega. **El botín** de 
   recoger.
 - **Forja** (Riberas) y **leva** (Las Lindes): paneles en los dos clientes, con las alforjas y los
   escudos de cada uno.
+
+## 6 bis · La talla a pie (27-sep-2026)
+
+Miguel: «los avatares son grandes de forma desproporcionada». Desde entonces quien anda mide la
+MITAD de la persona del mundo (`TALLA_A_PIE` = 0,5, `shared/mecanicas/talla.ts`, con las medidas que
+lo decidieron: puertas, banco, coche y barril de los tres juegos). Van con ella la marioneta propia y
+la de los demás, sus corazones y rótulo, las dos cámaras de a pie, la franja que choca con el adorno,
+la zancada, los brotes, el peón del anillo del Burgo y el labriego de Las Lindes vistos a pie (desde la
+mesa siguen grandes), el alcance del golpe y de las armas (la tabla de arriba ya va a la talla nueva),
+el radio de recoger (0,75), la separación al nacer (0,8) y el paso: 6 u/s andando y 13,2 corriendo.
+El servidor sigue aceptando la velocidad de la app 1.8.x (26,4, `VELOCIDAD_QUE_ACEPTA_EL_SERVIDOR`),
+así que quien no actualiza no recibe correcciones. El radio con el que se choca (0,4) NO cambia: decide
+también el reparto de los mundos. El Quiebro no se toca.
 
 ## 7 · Lo que sigue siendo de Miguel
 
