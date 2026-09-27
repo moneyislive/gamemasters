@@ -73,8 +73,9 @@
  *
  * Un zoom sin vuelta atrás atrapa: se entra a mirar una esquina y ya no se sabe
  * volver al tablero. Por eso hay un botón sobre el lienzo, «Ver el tablero
- * entero», que devuelve `comoAlPrincipio()`. Sólo se enseña cuando hace falta
- * —`estaComoAlPrincipio` es falso—: un botón que siempre está no informa de nada.
+ * entero», que devuelve la POSE DE SALIDA de este lienzo (`salidaDelDelta`: el delta entero
+ * entre la cinta y la mesa). Sólo se enseña cuando hace falta —`esLaSalida` es falso—: un
+ * botón que siempre está no informa de nada.
  *
  * ═══ EL MAZO: DOS MANOS EN EL MISMO LIENZO, Y UNA SOLA COSA COGIDA ═══
  *
@@ -150,7 +151,8 @@ import { Canvas } from '@react-three/fiber';
 import { ACESFilmicToneMapping } from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import type { Cercania } from '../../escenas/acercar';
-import { CERCANIA_DE_SALIDA, comoAlPrincipio, estaComoAlPrincipio } from '../../escenas/acercar';
+import { CERCANIA_DE_SALIDA } from '../../escenas/acercar';
+import { esLaSalida, salidaDelDelta } from '../../escenas/salida-del-delta';
 /* La cinta se mide con la MISMA función que la app y que `verify:escena`: ver `escenas/cinta.ts`. */
 import { altoDeLaCinta, BOTON_DE_LA_CINTA, loQueLlevaLaCinta } from '../../escenas/cinta';
 import type { RelojCargado, RelojDeLaMesa } from '../../escenas/reloj';
@@ -163,6 +165,7 @@ import type { CanalDeBotas } from '../../escenas/paseo/mesa-de-botas';
 import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos';
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
 import { LaForja, opcionesFueraDeLaForja, usarElAvisoDelHallazgo } from './a-pie-en-botas';
+import { PantallaCompleta } from './pantalla-completa';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
 /*
  * DE QUÉ COLOR SE VE CADA TERRENO. La MISMA tabla que pinta el tablero plano y la que
@@ -387,6 +390,28 @@ export function ComoSeAndaPorElDelta({
   readonly tactil?: boolean;
 }): JSX.Element | null {
   if (modo === 'mesa') return null;
+  /*
+   * ═══ EN UN TELÉFONO SE VE SÓLO EL CANAL, Y LO DEMÁS SE OYE ═══
+   *
+   * Medido con el fotógrafo el 27-sep: en 360×640 las instrucciones eran SEIS renglones en la mitad
+   * izquierda de la pantalla, encima de la palanca y tapando lo que se tenía delante; en 844×390, la
+   * mitad del ancho. Y lo que decían ya está escrito en los mandos: la palanca se ve, «Correr»,
+   * «Golpear» y «Mesa» llevan su palabra. Así que con el dedo se PINTA sólo lo que no dice ningún
+   * mando —cómo va el canal y los corazones, un renglón— y la frase entera se queda en el árbol
+   * para un lector (`riberas-como-se-anda-dicho`, fuera de la vista como `riberas-solo-apoyo`), que es quien no ve los mandos. Sin canal no se pinta nada
+   * (`-muda` le quita la placa).
+   */
+  if (tactil) {
+    return (
+      <p className={canal === undefined ? 'riberas-como-se-anda riberas-como-se-anda-tactil riberas-como-se-anda-muda' : 'riberas-como-se-anda riberas-como-se-anda-tactil'}>
+        <span className="riberas-como-se-anda-dicho">
+          {`${COMO_SE_ANDA_CON_EL_DEDO} · «${LOS_MANDOS_DE_LA_CAMARA.subir.rotulo}» vuelve a la mesa`}
+          {canal === undefined ? '' : ` · ${COMO_SE_GOLPEA_CON_EL_DEDO}. `}
+        </span>
+        {canal ?? null}
+      </p>
+    );
+  }
   return (
     <p className={tactil ? 'riberas-como-se-anda riberas-como-se-anda-tactil' : 'riberas-como-se-anda'}>
       {tactil
@@ -415,10 +440,18 @@ function MandoDeLaCamara({
   readonly alPulsar: () => void;
 }): JSX.Element {
   const dicho = `${mando.nombre} (tecla ${mando.tecla})`;
+  /*
+   * A PIE SUBEN A LOS DOS PRIMEROS SITIOS DE LA COLUMNA: andando no hay ni «Ver el tablero entero»
+   * ni «Recoger la mesa», y dejarlos a 7,25 y 10,5rem metía «Ojos» encima de la mano de bienes, que
+   * asoma por el canto derecho desde un tercio del alto (fotógrafo, 360×640 y 844×390, 27-sep). Se
+   * sabe por el mando: todos menos «A pie» se pulsan andando.
+   */
+  const aPie = mando !== LOS_MANDOS_DE_LA_CAMARA.bajar;
+  const clase = `${segundo ? 'riberas-camara riberas-camara-segunda' : 'riberas-camara'}${aPie ? ' riberas-camara-a-pie' : ''}`;
   return (
     <button
       type="button"
-      className={segundo ? 'riberas-camara riberas-camara-segunda' : 'riberas-camara'}
+      className={clase}
       onClick={alPulsar}
       aria-label={dicho}
       aria-keyshortcuts={mando.tecla}
@@ -1820,18 +1853,6 @@ export function RiberasEnTres({
     };
   }, [esBotas, llaveDelAsiento, puesta.asientos, puesta.codigo, vista, yo]);
   /*
-   * UNA MESA DE BOTAS SE EMPIEZA A PIE, y por la MISMA puerta que el mando y las teclas:
-   * `cambiarDeCamara` suelta lo cogido y recoge la mesa, que es lo que bajar tiene que hacer se baje
-   * como se baje. Una vez por mesa —se apunta su código—, y luego mandan el mando y las teclas.
-   */
-  const bajadoEnLaMesa = useRef<string | null>(null);
-  useEffect(() => {
-    if (!esBotas || bajadoEnLaMesa.current === puesta.codigo) return;
-    bajadoEnLaMesa.current = puesta.codigo;
-    cambiarDeCamara('hombro');
-  }, [esBotas, puesta.codigo, cambiarDeCamara]);
-
-  /*
    * ═══ EN UN TELÉFONO, LA PALANCA; Y EN UNA MESA DE BOTAS, LO QUE SE RECOGE ═══
    *
    * La referencia que la escena lee en su bucle (`mandos`) y que escriben los mandos táctiles
@@ -1880,6 +1901,26 @@ export function RiberasEnTres({
     laSalidaEspera.current = false;
     ponerMesaRecogida(false);
   }, [meTocaAhora, cogida, cartaDelMazo, aPie]);
+
+  /*
+   * UNA MESA DE BOTAS SE EMPIEZA A PIE, y por la MISMA puerta que el mando y las teclas:
+   * `cambiarDeCamara` suelta lo cogido y recoge la mesa, que es lo que bajar tiene que hacer se baje
+   * como se baje. Una vez por mesa —se apunta su código—, y luego mandan el mando y las teclas.
+   *
+   * VA DETRÁS DEL EFECTO DE ARRIBA, Y EL ORDEN ES EL ARREGLO. Los efectos corren en el orden en que
+   * se escriben, y en el primer render los dos actúan: sentarse en mi turno es un flanco de
+   * `meToca`, y aquel efecto, que aún ve `aPie` en falso, SACABA la mesa justo después de que éste
+   * la recogiera. Medido con el fotógrafo el 27-sep: se empezaba a pie con la barra entera colgada
+   * delante de la cámara de hombro, debajo de la palanca y de «Golpear». Escrito aquí detrás, el
+   * último en hablar es bajar a andar; y la salida que aquel efecto apuntó sigue apuntada, así que
+   * la mesa sale al volver a ella, que es cuando se va a jugar.
+   */
+  const bajadoEnLaMesa = useRef<string | null>(null);
+  useEffect(() => {
+    if (!esBotas || bajadoEnLaMesa.current === puesta.codigo) return;
+    bajadoEnLaMesa.current = puesta.codigo;
+    cambiarDeCamara('hombro');
+  }, [esBotas, puesta.codigo, cambiarDeCamara]);
 
   /*
    * La barra y lo que se está colocando se DERIVAN de la vista en cada render, no se
@@ -2803,16 +2844,22 @@ export function RiberasEnTres({
   const cercania = useRef<Cercania>(CERCANIA_DE_SALIDA);
   const [alPrincipio, ponerAlPrincipio] = useState(true);
   const eraAlPrincipio = useRef(true);
+  /*
+   * «AL PRINCIPIO» ES LA POSE DE SALIDA DE ESTE LIENZO, no `{ 1, centro }`: ver `laPoseDeSalida` abajo.
+   * Va en una referencia porque la leen la rueda y el botón, y la rueda no se vuelve a apuntar
+   * cada vez que el lienzo cambia de forma.
+   */
+  const laSalidaDeAhora = useRef<Cercania>(CERCANIA_DE_SALIDA);
   const alAcercarse = useCallback((nueva: Cercania): void => {
     cercania.current = nueva;
-    const ahora = estaComoAlPrincipio(nueva);
+    const ahora = esLaSalida(nueva, laSalidaDeAhora.current);
     if (ahora === eraAlPrincipio.current) return;
     eraAlPrincipio.current = ahora;
     ponerAlPrincipio(ahora);
   }, []);
   /* La salida. Pasa por el mismo sitio que la rueda, así que el botón se apaga solo. */
   const volverAlTableroEntero = useCallback((): void => {
-    alAcercarse(comoAlPrincipio());
+    alAcercarse(laSalidaDeAhora.current);
   }, [alAcercarse]);
 
   const semilla = useMemo(() => semillaDelCodigo(puesta.codigo), [puesta.codigo]);
@@ -2820,6 +2867,40 @@ export function RiberasEnTres({
     () => (datos === null ? null : encuadreDelDelta(datos.islas.map((i) => i.hex))),
     [datos],
   );
+  /*
+   * ═══ LA POSE DE SALIDA: EL DELTA ENTERO ENTRE LA CINTA Y LA MESA (PANTALLAS §4.6) ═══
+   *
+   * Mirar al centro desde la distancia de siempre dejaba en los apaisados la fila sur de
+   * comarcas DETRÁS de la mesa y fuera del lienzo (en 844×390 el delta llegaba a 495 puntos de
+   * un lienzo de 390), y en los de pie el delta en el 70 % del ancho con media pantalla de mar.
+   * `salidaDelDelta` corre la mirada y ajusta el acercamiento para que quepa entero en la banda
+   * libre —debajo de la cinta, y de su carril si cabe; encima de la barra y entre las dos manos—. La cuenta
+   * y por qué no es el «factor que encaja» que se quitó, en `escenas/salida-del-delta.ts`.
+   *
+   * SÓLO DEPENDE DEL LIENZO, y a propósito: el carril y los naipes van y vienen con cada jugada,
+   * y una pose que los mirase movería la cámara con la revisión de la mesa, que es marear a quien
+   * construye. Así que se les deja sitio SIEMPRE —las dos tiras de naipes, y el carril donde cabe— y
+   * lo único que la recalcula es girar el aparato o cambiar la ventana. Y aun eso sólo mientras se
+   * esté al principio: quien mira una esquina de cerca no quiere que le devuelvan al centro.
+   */
+  const laPoseDeSalida = useMemo(
+    () =>
+      datos === null || encuadre === null
+        ? CERCANIA_DE_SALIDA
+        : salidaDelDelta(datos.islas.map((i) => i.hex), encuadre.alcance, {
+            ancho: lienzo.ancho,
+            alto: lienzo.alto,
+            arriba: altoDeLaCinta(false) + 8,
+            arribaSiCabe: altoDeLaCinta(true) + 8,
+            conManos: true,
+          }),
+    [datos, encuadre, lienzo.ancho, lienzo.alto],
+  );
+  useEffect(() => {
+    const seguiaAlPrincipio = eraAlPrincipio.current;
+    laSalidaDeAhora.current = laPoseDeSalida;
+    if (seguiaAlPrincipio) alAcercarse(laPoseDeSalida);
+  }, [laPoseDeSalida, alAcercarse]);
 
   /*
    * SIN ISLAS NO HAY DELTA QUE PINTAR: sólo lo que se puede hacer. Es lo mismo que
@@ -3448,6 +3529,7 @@ export function RiberasEnTres({
             {avisoDelHallazgo}
             {/* En un teléfono y a pie, la palanca: ver `mandos-tactiles.tsx`. */}
             <MandosTactiles mandos={mandos} visibles={tactil && aPie} conGolpe={canal !== undefined} />
+            <PantallaCompleta flotante="izquierda" />
             {/*
               LA SALIDA, y sólo cuando hace falta. Un zoom del que no se sabe volver
               atrapa: se entra a mirar una esquina del delta y ya no se encuentra el
@@ -3746,6 +3828,9 @@ export function RiberasEnTres({
  * del delta, y sin devolvérselo el carril no se puede rodar CON EL DEDO, que es tanto como no
  * tenerlo.
  */
+/** Hasta cuántas opciones sin isla se escriben con palabras en el carril en vez de con su ordinal. */
+const LISTA_CORTA_DEL_CARRIL = 3;
+
 function ElCarril({
   opciones,
   alElegir,
@@ -3815,6 +3900,9 @@ function ElCarril({
    * mismo orden y por eso declara `atajos={false}`. Ver `usarLosAtajos`.
    */
   usarLosAtajos(pintables, alElegir, quieto);
+  /* Una lista corta y sin islas que nombrar se escribe con palabras: ver el cuadrado de abajo. */
+  const conPalabras =
+    pintables.length > 0 && pintables.length <= LISTA_CORTA_DEL_CARRIL && pintables.every((o) => !glifos.has(o.clave));
 
   return (
     <div
@@ -3877,7 +3965,7 @@ function ElCarril({
           <button
             key={o.clave}
             type="button"
-            className={quieto ? 'riberas-carril-opcion riberas-carril-quieta' : 'riberas-carril-opcion'}
+            className={`${quieto ? 'riberas-carril-opcion riberas-carril-quieta' : 'riberas-carril-opcion'}${conPalabras ? ' riberas-carril-con-palabra' : ''}`}
             aria-disabled={quieto}
             aria-labelledby={idRotulo}
             aria-describedby={o.ayuda.length > 0 ? idAyuda : undefined}
@@ -3901,9 +3989,27 @@ function ElCarril({
                 aria-hidden="true"
               />
             )}
-            <span className="riberas-carril-glifo" aria-hidden="true">
-              {suGlifo === null ? i + 1 : suGlifo.glifo}
-            </span>
+            {conPalabras ? (
+              /*
+               * ═══ EN LAS LISTAS CORTAS, LA PALABRA ═══
+               *
+               * Con el fotógrafo, el 27-sep, a pie en un teléfono: el carril llevaba UN cuadrado
+               * con un «1» morado y nada más. Era «Tirar los dados», y en un aparato sin teclado
+               * un ordinal no es un atajo: es un botón que no dice qué hace. En las listas cortas
+               * —tirar, pasar, aceptar, rechazar— sí cabe el rótulo del juego, así que se pinta;
+               * el ordinal se queda delante para el teclado y se esconde con el dedo
+               * (`.riberas-carril-atajo`). En las largas —el estiaje, con su número de isla— sigue
+               * mandando el glifo.
+               */
+              <span className="riberas-carril-glifo" aria-hidden="true">
+                {conAtajo ? <span className="riberas-carril-atajo">{i + 1}</span> : null}
+                <span className="riberas-carril-palabra">{o.rotulo}</span>
+              </span>
+            ) : (
+              <span className="riberas-carril-glifo" aria-hidden="true">
+                {suGlifo === null ? i + 1 : suGlifo.glifo}
+              </span>
+            )}
             {/*
               LA BARRA DEL TERRENO AL PIE. El número de la isla no es único —el reparto lleva
               dos de cada cifra— así que esto es lo que separa dos «11» distintos, con el mismo

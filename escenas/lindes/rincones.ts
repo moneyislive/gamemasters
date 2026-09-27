@@ -115,6 +115,33 @@ export const INCLINACION_DE_LA_MANO = Math.PI / 2 - VUELTA_DE_LA_MANO;
  */
 export const LO_QUE_SOBRESALE = 0.25;
 
+/**
+ * ═══ LA FRANJA DE ABAJO QUE NO ES DEL LIENZO ═══
+ *
+ * Los dos rincones van abajo, y abajo es también donde las pantallas ponen lo suyo encima del
+ * lienzo: la cinta con la frase de la mesa y, a pie en un teléfono, la PALANCA a la izquierda y
+ * «Correr» y «Golpear» a la derecha. Sentado a una mesa de botas en la Sala de un móvil (27-sep-2026,
+ * `docs/PANTALLAS.md`), la palanca caía encima de la losa de la mano —el recuadro verde de abajo a
+ * la izquierda, que se leía como un minimapa tapado— y «Correr» encima del reloj. No fallaba nada:
+ * el jugador, sencillamente, no veía qué losa tenía.
+ *
+ * La escena no sabe qué pinta encima la pantalla, así que se lo DICE quien lo pinta: `reservaAbajo`,
+ * la franja tapada en fracción del alto del lienzo. Los dos rincones apoyan su borde de abajo
+ * encima de ella, y si el hueco que queda es poco —un teléfono tumbado con la palanca, que se come
+ * casi la mitad— encogen para caber (`PARTE_DEL_HUECO_LIBRE`) en vez de subir hasta las cámaras.
+ * Sin reserva la cuenta es la de siempre: el tope nuevo sólo muerde cuando hay franja.
+ */
+export const RESERVA_MAXIMA = 0.6;
+
+/** Lo más que ocupa de alto un rincón dentro del hueco que queda por encima de la franja. */
+export const PARTE_DEL_HUECO_LIBRE = 0.36;
+
+/** Dónde empieza el hueco de los rincones (su «suelo», en el eje de la cámara) y cuánto alto le queda. */
+export function elSueloDeLosRincones(medioAlto: number, reservaAbajo: number): { suelo: number; libre: number } {
+  const reserva = Number.isFinite(reservaAbajo) ? Math.min(RESERVA_MAXIMA, Math.max(0, reservaAbajo)) : 0;
+  return { suelo: -medioAlto + 2 * medioAlto * reserva, libre: 2 * medioAlto * (1 - reserva) };
+}
+
 /** Dónde acaba colgada la losa de la mano, respecto de la cámara. */
 export interface SitioDeLaMano {
   /** Cuánto se avanza por el eje de la cámara. */
@@ -142,29 +169,38 @@ export interface SitioDeLaMano {
  * alto. A `d` de una cámara de `fov` grados, el medio alto visible es `d · tan(fov/2)`:
  * de ahí sale todo lo demás y por eso no hay ni un número probado a ojo.
  */
-export function sitioDeLaMano(fov: number, aspecto: number, distancia: number): SitioDeLaMano {
+export function sitioDeLaMano(
+  fov: number,
+  aspecto: number,
+  distancia: number,
+  /** La franja de abajo que tapan los mandos o la cinta, en fracción del alto. Ver `RESERVA_MAXIMA`. */
+  reservaAbajo = 0,
+): SitioDeLaMano {
   const medioAlto = distancia * Math.tan((fov * Math.PI) / 360);
   const medioAncho = medioAlto * Math.max(1e-6, aspecto);
-
-  const media = Math.min(
-    medioAlto * PARTE_DEL_ALTO_QUE_OCUPA,
-    medioAncho * PARTE_DEL_ANCHO_QUE_OCUPA,
-  );
-  const aire = medioAlto * AIRE_HASTA_EL_CANTO;
+  const { suelo, libre } = elSueloDeLosRincones(medioAlto, reservaAbajo);
 
   /*
    * Lo que se ve de ancho es el lado entero: el giro es sobre el eje horizontal y no toca
    * la anchura. Lo de alto es el lado ACOSTADO —por eso el coseno— más lo que las piezas
-   * levantan, que con la losa inclinada se proyecta por el seno.
+   * levantan, que con la losa inclinada se proyecta por el seno. `enAlto` es cuánto crece
+   * lo de alto por cada unidad de `media`.
    */
+  const enAlto = Math.cos(VUELTA_DE_LA_MANO) + 2 * LO_QUE_SOBRESALE * Math.sin(VUELTA_DE_LA_MANO);
+  const media = Math.min(
+    medioAlto * PARTE_DEL_ALTO_QUE_OCUPA,
+    medioAncho * PARTE_DEL_ANCHO_QUE_OCUPA,
+    (libre * PARTE_DEL_HUECO_LIBRE) / (2 * enAlto),
+  );
+  const aire = medioAlto * AIRE_HASTA_EL_CANTO;
+
   const mediaEnAncho = media;
-  const mediaEnAlto =
-    media * Math.cos(VUELTA_DE_LA_MANO) + media * 2 * LO_QUE_SOBRESALE * Math.sin(VUELTA_DE_LA_MANO);
+  const mediaEnAlto = media * enAlto;
 
   return {
     adelante: distancia,
     derecha: -medioAncho + aire + mediaEnAncho,
-    arriba: -medioAlto + aire + mediaEnAlto,
+    arriba: suelo + aire + mediaEnAlto,
     escala: (media * 2) / LADO_DE_LOSA,
     media,
     mediaEnAncho,
@@ -243,14 +279,18 @@ export function sitioDelRelojDeLaBolsa(
   /** `ALTO_DEL_RELOJ_EN_LADOS` de `reloj.tsx`: lo alto que es el MÁS alto de los dos relojes. */
   altoEnLados: number,
   distancia: number,
+  /** La franja tapada de abajo, igual que en `sitioDeLaMano`. */
+  reservaAbajo = 0,
 ): SitioDelReloj {
   const medioAlto = distancia * Math.tan((fov * Math.PI) / 360);
   const medioAncho = medioAlto * Math.max(1e-6, aspecto);
+  const { suelo, libre } = elSueloDeLosRincones(medioAlto, reservaAbajo);
 
   /* Lo que va a ocupar de alto en el mundo, y de ahí se despeja su `lado`. */
   const alto = Math.min(
     medioAlto * PARTE_DEL_ALTO_DEL_RELOJ * 2,
     medioAncho * PARTE_DEL_ANCHO_DEL_RELOJ * 2,
+    libre * PARTE_DEL_HUECO_LIBRE,
   );
   const lado = alto / Math.max(1e-6, altoEnLados);
   const aire = medioAlto * AIRE_HASTA_EL_CANTO;
@@ -261,7 +301,7 @@ export function sitioDelRelojDeLaBolsa(
   return {
     adelante: distancia,
     derecha: medioAncho - aire - mediaEnAncho,
-    arriba: -medioAlto + aire + mediaEnAlto,
+    arriba: suelo + aire + mediaEnAlto,
     lado,
     ancho: lado * ANCHO_DEL_RELOJ_EN_ALTOS,
     mediaEnAncho,

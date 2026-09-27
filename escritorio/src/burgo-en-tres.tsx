@@ -201,8 +201,9 @@ import { COMO_SE_GOLPEA, SIN_MANDOS_DE_FUERA } from '../../escenas/paseo/mandos'
 import type { MandosDeFuera } from '../../escenas/paseo/mandos';
 import { usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
+import { PantallaCompleta } from './pantalla-completa';
 import { poseDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
-import type { SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
+import type { RectanguloEnPuntos, SitioDeLaBandeja } from '../../escenas/burgo/bandeja-de-los-dados';
 import type { RelojDeLaMesa } from '../../escenas/reloj';
 import {
   ALCANCE_DEL_BURGO,
@@ -508,18 +509,27 @@ export function ComoSeAndaPorElBurgo({
   readonly tactil?: boolean;
 }): JSX.Element | null {
   if (modo === 'mesa') return canal === undefined ? null : <p className="burgo-como-se-anda">{canal}</p>;
+  /*
+   * ═══ EN UN TELÉFONO LA PISTA SE VA SOLA (27-sep-2026) ═══
+   *
+   * Medido con el fotógrafo en un móvil de 360 de ancho: las tres líneas del cartel —la palanca, el
+   * correr, volver, golpear y el canal— se quedaban un tercio de la pantalla encima de la calle, todo
+   * el rato que se anda. Con el dedo, lo que se toca YA SE VE (la palanca y los botones están ahí), así
+   * que la pista (`.burgo-como-se-anda-pista`) se lee al bajar y se recoge a los pocos segundos; lo que
+   * se queda es cómo va el canal, que cambia y hace falta. Con teclado no se recoge: las teclas no se
+   * ven en ninguna parte.
+   */
+  const pista = tactil
+    ? `${COMO_SE_ANDA_CON_EL_DEDO} · «La mesa» para volver`
+    : 'W A S D o las flechas para andar · Mayúsculas para correr · 1 para volver a la mesa';
+  const golpe = canal === undefined ? '' : ` · ${tactil ? COMO_SE_GOLPEA_CON_EL_DEDO : COMO_SE_GOLPEA}`;
   return (
-    <p className="burgo-como-se-anda">
-      {tactil
-        ? `${COMO_SE_ANDA_CON_EL_DEDO} · «La mesa» para volver`
-        : 'W A S D o las flechas para andar · Mayúsculas para correr · 1 para volver a la mesa'}
-      {canal === undefined ? null : ` · ${tactil ? COMO_SE_GOLPEA_CON_EL_DEDO : COMO_SE_GOLPEA}`}
-      {canal === undefined ? null : (
-        <>
-          <br />
-          {canal}
-        </>
-      )}
+    <p className={tactil ? 'burgo-como-se-anda burgo-como-se-anda-tactil' : 'burgo-como-se-anda'}>
+      <span className="burgo-como-se-anda-pista">
+        {pista}
+        {golpe}
+      </span>
+      {canal === undefined ? null : <span className="burgo-como-se-anda-canal">{canal}</span>}
     </p>
   );
 }
@@ -1082,7 +1092,12 @@ export function BurgoEnTres({
     const caja = poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo;
     const derecha = Math.ceil(lienzo.ancho - caja.x0 + SITIO_DE_LA_BANDEJA.margen);
     if (lienzo.ancho - derecha - SITIO_DE_LA_BANDEJA.margen < ANCHO_MINIMO_DEL_CARTEL_AL_LADO) return EL_SITIO_DEL_CARTEL;
-    return { ...EL_SITIO_DEL_CARTEL, right: `${String(derecha)}px` };
+    /*
+     * EN UNA PANTALLA BAJA Y APAISADA las cámaras bajan al pie de la izquierda (ver la hoja, 27-sep-2026):
+     * el cartel sube por encima de ellas —su tira de 2,75rem y medio rem de aire— para no taparlas.
+     */
+    const abajo = lienzo.alto < ALTO_DE_LA_PANTALLA_BAJA && lienzo.ancho > lienzo.alto ? { bottom: 'calc(0.75rem + 2.75rem + 0.5rem)' } : null;
+    return { ...EL_SITIO_DEL_CARTEL, right: `${String(derecha)}px`, ...abajo };
   }, [lienzo.ancho, lienzo.alto]);
   const [raizDeLaLetra, ponerRaizDeLaLetra] = useState(RAIZ_DE_LA_CASA);
   const observadorDelRecuadro = useRef<ResizeObserver | null>(null);
@@ -1192,14 +1207,24 @@ export function BurgoEnTres({
    * la esquina de SALIDA detrás de ella, que es donde empiezan todos los peones. La mirada se corre
    * lo justo (`poseDeSalidaAlLadoDeLaCaja`), medido con la misma pose con la que la escena la posa.
    */
+  /*
+   * ═══ Y TAMPOCO DETRÁS DE LA CINTA NI DE LAS CÁMARAS (27-sep-2026) ═══
+   *
+   * Medido con el fotógrafo (`docs/PANTALLAS.md`): en un móvil tumbado y en un portátil la esquina de
+   * arriba del anillo quedaba debajo de la cinta, y su canto izquierdo debajo de «La mesa · Al hombro ·
+   * Sus ojos». Así que se miden en la página —con el mundo ya puesto, que es cuando hay cámaras— y van
+   * de `estorbos` (`lugaresQueTapanElAnillo`).
+   */
+  const hayMundo = modelos !== null;
   useEffect(() => {
+    const estorbos = lienzo.ancho > 0 && lienzo.alto > 0 ? lugaresQueTapanElAnillo(elRecuadro.current, raizDeLaLetra) : [];
     const nueva =
       lienzo.ancho > 0 && lienzo.alto > 0
-        ? poseDeSalidaAlLadoDeLaCaja({ ancho: lienzo.ancho, alto: lienzo.alto, franjaInferior: 0 }, poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo)
+        ? poseDeSalidaAlLadoDeLaCaja({ ancho: lienzo.ancho, alto: lienzo.alto, franjaInferior: 0 }, poseDeLaBandeja(lienzo.ancho, lienzo.alto, FOV, SITIO_DE_LA_BANDEJA).rectangulo, estorbos)
         : CERCANIA_DE_SALIDA;
     laPoseDeSalida.current = nueva;
     if (eraAlPrincipio.current) cercania.current = nueva;
-  }, [lienzo.ancho, lienzo.alto]);
+  }, [lienzo.ancho, lienzo.alto, hayMundo, raizDeLaLetra]);
   const volverAlBurgoEntero = useCallback((): void => {
     alAcercarse(laPoseDeSalida.current);
     /* Y el seguimiento se apaga hasta el turno siguiente: quien pide ver el burgo entero lo quiere quieto. */
@@ -1257,6 +1282,13 @@ export function BurgoEnTres({
   const tactil = usarAparatoTactil();
   const mandos = useRef<MandosDeFuera>(SIN_MANDOS_DE_FUERA);
   const { alRecoger, aviso: avisoDelHallazgo } = usarElAvisoDelHallazgo('burgo', puesta.asientos);
+  /* A pie y con el dedo, la caja se aparta de la palanca y de los botones: ver `sitioDeLaBandejaAPie`. */
+  const conLosMandos = tactil && aPie;
+  const sitioDeLaBandeja = useMemo(
+    (): SitioDeLaBandeja =>
+      conLosMandos && lienzo.ancho > 0 && lienzo.alto > 0 ? sitioDeLaBandejaAPie(lienzo.ancho, lienzo.alto, raizDeLaLetra) : SITIO_DE_LA_BANDEJA,
+    [conLosMandos, lienzo.ancho, lienzo.alto, raizDeLaLetra],
+  );
 
   // -------------------------------------------------------------------------
   // Las cribas: qué enseña la escena, qué la caja, qué el carril, qué la hoja
@@ -1635,7 +1667,11 @@ export function BurgoEnTres({
   const elCartel = senalado === null ? [] : cartelDeCasilla(vista, senalado.casilla).frases;
 
   return (
-    <div className="burgo-en-tres">
+    /*
+      A PIE, UNA CLASE MÁS: en la mesa y en una pantalla baja las cámaras bajan al pie de la izquierda
+      (ver `.burgo-en-tres:not(.burgo-andando)` en la hoja); a pie ahí va la palanca, y se quedan arriba.
+    */
+    <div className={aPie ? 'burgo-en-tres burgo-andando' : 'burgo-en-tres'}>
       {/*
         ═══ EL RECUADRO, QUE ES DONDE ATERRIZA EL FOCO AL SENTARSE Y DONDE VIVE TODO ═══
 
@@ -1674,6 +1710,7 @@ export function BurgoEnTres({
               <span aria-hidden="true">‹</span>
             </a>
           )}
+          <PantallaCompleta />
           {/*
             EL RELOJ NO ES UNA SEGUNDA REGIÓN VIVA, que sería peor que no ponerlo: la frase de
             al lado ya es `aria-live="polite"`, y un reloj vivo a su lado anunciaría la cuenta
@@ -1958,7 +1995,7 @@ export function BurgoEnTres({
                   traer={traer}
                   calidad={calidad}
                   camara={camara}
-                  bandejaDeLosDados={SITIO_DE_LA_BANDEJA}
+                  bandejaDeLosDados={sitioDeLaBandeja}
                   reloj={relojDeArena}
                   alPasarElTurno={alPasarElTurno}
                   seguirAlQueMueve={siguiendo && aQuienSigue !== null}
@@ -2284,6 +2321,8 @@ export function BurgoEnTres({
 const EL_SITIO_DEL_CARTEL: CSSProperties = { right: '0.75rem', bottom: '0.75rem', left: '0.75rem' };
 /** Lo menos que tiene que medir de ancho el cartel del pie para ir al lado de la caja del Burgo, en puntos. */
 const ANCHO_MINIMO_DEL_CARTEL_AL_LADO = 220;
+/** Por debajo de este alto (los 30rem de la hoja, con la letra de la casa) las cámaras de la mesa van abajo a la izquierda. */
+const ALTO_DE_LA_PANTALLA_BAJA = 480;
 
 /**
  * LA CAJA DEL BURGO, ABAJO A LA DERECHA DEL LIENZO: los dados, el dinero, el reloj de arena, los mazos
@@ -2292,6 +2331,72 @@ const ANCHO_MINIMO_DEL_CARTEL_AL_LADO = 220;
  * (`sitioDelCartel`). Los 12 puntos son el mismo `0.75rem` de los demás cromos con la letra de la casa.
  */
 const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = { esquina: 'abajo-derecha', margen: 12 };
+
+/**
+ * ═══ A PIE EN UN TELÉFONO, LA CAJA SE APARTA DE LOS MANDOS (27-sep-2026) ═══
+ *
+ * Medido con el fotógrafo (`docs/PANTALLAS.md`): a pie en un móvil tumbado, «Golpear» y «Correr» caían
+ * encima de los dados y la palanca encima del dinero; de pie, la palanca tapaba media caja. Los mandos
+ * (`mandos-tactiles.tsx`, `.mandos-tactiles` en la hoja) son la palanca de 8rem abajo a la izquierda y
+ * los dos botones abajo a la derecha: apilados (4,75rem + 0,5 + 3rem de alto, 7rem de ancho) o, en una
+ * pantalla de menos de 30rem de alto, en fila (4,75rem de alto, 4,75 + 0,5 + 7rem de ancho).
+ *
+ * Si entre la palanca y los botones cabe una caja que se lea (`ANCHO_MINIMO_DE_LA_CAJA_ENTRE_LOS_MANDOS`),
+ * va AHÍ, entre los dos pulgares; si no —un teléfono de pie—, va ENCIMA de ellos, a lo ancho. En la mesa,
+ * o con ratón, la de siempre.
+ */
+const ANCHO_MINIMO_DE_LA_CAJA_ENTRE_LOS_MANDOS = 300;
+function sitioDeLaBandejaAPie(ancho: number, alto: number, raiz: number): SitioDeLaBandeja {
+  const margen = SITIO_DE_LA_BANDEJA.margen;
+  const hueco = 0.75 * raiz;
+  const enFila = alto < 30 * raiz;
+  const palanca = 8 * raiz;
+  const botonesAncho = (enFila ? 4.75 + 0.5 + 7 : 7) * raiz;
+  const botonesAlto = (enFila ? 4.75 : 4.75 + 0.5 + 3) * raiz;
+  const entre = ancho - 2 * hueco - palanca - botonesAncho - 2 * margen;
+  if (entre >= ANCHO_MINIMO_DE_LA_CAJA_ENTRE_LOS_MANDOS) {
+    return { ...SITIO_DE_LA_BANDEJA, apartadoDerecho: hueco + botonesAncho, anchoMaximo: entre };
+  }
+  return { ...SITIO_DE_LA_BANDEJA, apartadoVertical: hueco + Math.max(palanca, botonesAlto) };
+}
+
+/**
+ * LO QUE TAPA EL ANILLO DESDE ARRIBA, en puntos del recuadro: la cinta, las cámaras y el hueco del
+ * carril. Se mide en la página y no se calcula aquí, porque su ancho depende de la letra y del
+ * navegador. Las cámaras bajan una tira cuando aparece el carril (`.burgo-a-pie-con-carril`), y la pose
+ * de salida no puede saltar cada vez que aparece o se va un cuadrado: por eso se cuentan en las DOS
+ * alturas, y el carril, centrado, con el ancho de tres cuadrados aunque ahora no haya ninguno.
+ */
+function lugaresQueTapanElAnillo(recuadro: HTMLElement | null, raiz: number): RectanguloEnPuntos[] {
+  if (recuadro === null || typeof recuadro.getBoundingClientRect !== 'function') return [];
+  const origen = recuadro.getBoundingClientRect();
+  const relativo = (e: Element | null): RectanguloEnPuntos | null => {
+    if (e === null) return null;
+    const r = e.getBoundingClientRect();
+    if (!(r.width > 0 && r.height > 0)) return null;
+    return { x0: r.left - origen.left, y0: r.top - origen.top, x1: r.right - origen.left, y1: r.bottom - origen.top };
+  };
+  const lugares: RectanguloEnPuntos[] = [];
+  const cinta = relativo(recuadro.querySelector('.burgo-cinta'));
+  if (cinta !== null) lugares.push(cinta);
+  const tira = 2.75 * raiz;
+  const camaras = relativo(recuadro.querySelector('.burgo-camaras'));
+  if (camaras !== null) {
+    const arriba = camaras.y0 < origen.height / 2;
+    const hayCarril = recuadro.querySelector('.lienzo-carril') !== null;
+    lugares.push(
+      arriba
+        ? { ...camaras, y0: camaras.y0 - (hayCarril ? tira : 0), y1: camaras.y1 + (hayCarril ? 0 : tira) }
+        : camaras,
+    );
+  }
+  if (cinta !== null) {
+    const medio = origen.width / 2;
+    const ancho = 3 * tira + 1.5 * raiz;
+    lugares.push({ x0: medio - ancho / 2, y0: cinta.y1, x1: medio + ancho / 2, y1: cinta.y1 + tira });
+  }
+  return lugares;
+}
 
 /**
  * LAS TRES CAJAS QUE SEÑALAN DEJAN EL PIE LIBRE, Y ESO TAMBIÉN SE MIDIÓ EN EL BANCO.

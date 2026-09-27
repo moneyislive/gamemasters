@@ -58,6 +58,7 @@ import { estorbosDePiezas, indiceDeEstorbos, rodajasDeUnaMalla, SIN_ESTORBOS, ta
 import type { Estorbo } from '../paseo/estorbos';
 import { ciudadDelCodigo } from '../burgo/ciudad';
 import { estorbosDelBurgo } from '../burgo/estorbos-del-burgo';
+import { estorbosDelDelta } from '../estorbos-del-delta';
 import { CLIP } from '../embarcadero/figuras';
 import {
   COMO_SE_GOLPEA,
@@ -1305,6 +1306,57 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
     !miraLoQueEstorba(gancho.replace('Math.min(cabe, noTapa)', 'cabe')) && !elBurgoLoDa(burgo.replace('estorbos: estorbosAPie,', '')),
   );
   /*
+   * Y EN RIBERAS, CON EL ADORNO DEL DELTA (27-sep). La cámara de hombro atravesaba los pinos, las
+   * casas del caserío y los barcos, que viven sólo en el plan del mundo de `delta.tsx`. Ahora
+   * `estorbosDelDelta` los lee de ESE plan —la misma lista con la que se instancian— y la escena los
+   * pasa al paseo por `AndarPorElDelta`. Se prueba con un pino de prueba (tronco y copa) al sur de
+   * quien pasea, y se ve caer quitándole la prop al delta o al paseo.
+   */
+  const PINO: readonly Estorbo[] = [
+    { x0: -0.3, y0: 0, z0: -0.3, x1: 0.3, y1: 2, z1: 0.3 },
+    { x0: -1.5, y0: 2, z0: -1.5, x1: 1.5, y1: 6, z1: 1.5 },
+  ];
+  const copia = (x: number, z: number): { posicion: { x: number; y: number; z: number }; giro: number; escala: { x: number } } => ({
+    posicion: { x, y: 0, z },
+    giro: 0,
+    escala: { x: 1 },
+  });
+  const delDelta = estorbosDelDelta(
+    new Map([
+      ['0,0|pino', [copia(0, 4.5)]],
+      ['mar|desconocido', [copia(30, 30)]],
+    ]),
+    [{ modelo: 'casa', puesta: copia(-20, -20) }],
+    (p) => (p === 'pino' || p === 'casa' ? PINO : null),
+  );
+  const conElPino = indiceDeEstorbos(delDelta);
+  const quienEnElDelta = { x: 0, z: 0, rumbo: 0 };
+  const pechoEnElDelta = { x: 0, y: LO_QUE_HAY_QUE_VER, z: 0 };
+  const cabeEnElDelta = hastaDondeCabeElHombro(ABIERTO, quienEnElDelta);
+  const sinAdorno = camaraDeHombro(quienEnElDelta, 0, cabeEnElDelta);
+  const conAdorno = camaraDeHombro(quienEnElDelta, 0, Math.min(cabeEnElDelta, hastaDondeNoTapa(conElPino, quienEnElDelta, 0, cabeEnElDelta)));
+  comprobar(
+    'el adorno del delta: las rodajas de cada copia del plan y del caserío, y nada de lo que el catálogo no conoce',
+    delDelta.length === 4,
+    delDelta,
+  );
+  comprobar(
+    'y con un pino a 4,5 por detrás, la arena sola deja la cámara detrás de la copa; con el adorno del delta, delante',
+    tapaLaVista(conElPino, pechoEnElDelta, sinAdorno) && !tapaLaVista(conElPino, pechoEnElDelta, conAdorno),
+    { cabeEnElDelta, sinAdorno, conAdorno },
+  );
+  const delta = leer('./../delta.tsx');
+  const andar = leer('./../andar-por-el-delta.tsx');
+  const elDeltaLoDa = (d: string, a: string): boolean =>
+    /indiceDeEstorbos\(estorbosDelDelta\(plan\.cosas, plan\.caserio, rodajasDelCatalogo\(modelos\)\)\)/.test(d) &&
+    /<AndarPorElDelta[^>]*\bestorbos=\{estorbosAPie\}/.test(d) &&
+    /usarElPaseo\(\{[^}]*\bestorbos \}\)/.test(a);
+  comprobar('y el delta se lo da al paseo, medido en el catálogo que pinta', elDeltaLoDa(delta, andar));
+  comprobar(
+    'y se ve caer: con un delta que no pasa su adorno, o con un paseo del delta que no lo recibe',
+    !elDeltaLoDa(delta.replace('estorbos={estorbosAPie}', ''), andar) && !elDeltaLoDa(delta, andar.replace(', estorbos })', ' })')),
+  );
+  /*
    * EL FOTOGRAMA DEL GANCHO ES EL MEDIDO ARRIBA: `fotogramaDeQuienPasea`, con las teclas, los mandos
    * de fuera, las dos cuentas de golpes, si está caído según el canal y la costura con la red. Se ve
    * caer quitándole el suelo —el gancho andaría tumbado— y quitándole la cuenta del teclado.
@@ -1359,9 +1411,13 @@ paso('El montaje: la escena y la app usan esto, y no otra cosa');
    */
   comprobar(
     'la pantalla de Las Lindes de la app monta la palanca a pie, y le pasa a la escena la misma referencia',
-    /* Detrás de `mandos` puede ir el aviso de los hallazgos (`alRecoger`, docs/AVATARES-JUGABLES.md §6), y nada más. */
+    /*
+     * Detrás de `mandos` puede ir el aviso de los hallazgos (`alRecoger`, docs/AVATARES-JUGABLES.md §6)
+     * y la franja que tapan los mandos (`reservaAbajo`, docs/PANTALLAS.md: los rincones se apoyan
+     * encima de la palanca), y nada más.
+     */
     /<MandosDelPaseo mandos=\{mandos\} visibles=\{modo !== 'mesa'\} \/>/.test(pantalla) &&
-      /\bmandos=\{mandos\}\s*\n\s*(?:alRecoger=\{alRecoger\}\s*\n\s*)?\/>/.test(pantalla),
+      /\bmandos=\{mandos\}\s*\n\s*(?:alRecoger=\{alRecoger\}\s*\n\s*)?(?:reservaAbajo=\{reservaAbajo\}\s*\n\s*)?\/>/.test(pantalla),
   );
   comprobar(
     'y la palanca responde al dedo con `PanResponder` y escribe en esa referencia, sin `onClick`',

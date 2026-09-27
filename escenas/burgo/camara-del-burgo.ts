@@ -25,7 +25,8 @@
  *     alto que los 40° del delta porque hay que LEER las aceras de color.
  *   · `LIMITES_DEL_BURGO`: `masCerca 0,15` (570,24 × 0,15 = 85,54: una casilla y sus vecinas
  *     llenando el lienzo; a esa cercanía una casilla ocupa más del 45 % del alto, medido)
- *     y `masLejos 1,25`, el de siempre.
+ *     y `masLejos 1,6` —era 1,25, el de siempre, hasta que la pose de salida tuvo que apartarse
+ *     también de la cinta y de las cámaras en un teléfono tumbado (ver `RETIRO_MAXIMO_DE_LA_SALIDA`)—.
  *
  *     EL 0,15 NO SE HA TOCADO AL TRIPLICAR EL TABLERO, y ésa es la prueba de que las cifras
  *     de este fichero están bien escritas: `fondo de casilla / (alcance × masCerca)` valía
@@ -61,8 +62,8 @@ export const ALCANCE_DEL_BURGO = MEDIO_LADO * 1.32;
 /** Más alto que el delta (40°): hay que leer las aceras. El rumbo es sólo el punto de partida. */
 export const MIRADOR_DEL_BURGO: Mirador = { rumbo: 0.35, altura: (55 * Math.PI) / 180 };
 
-/** 570,24 × 0,15 = 85,54: una casilla y sus vecinas llenando el lienzo, igual que antes (ver la cabecera). */
-export const LIMITES_DEL_BURGO: LimitesDeCercania = { masCerca: 0.15, masLejos: 1.25 };
+/** 570,24 × 0,15 = 85,54: una casilla y sus vecinas llenando el lienzo, igual que antes (ver la cabecera). Y 1,6 de lejos: ver `RETIRO_MAXIMO_DE_LA_SALIDA`. */
+export const LIMITES_DEL_BURGO: LimitesDeCercania = { masCerca: 0.15, masLejos: 1.6 };
 
 /** La de siempre: lo más alto del anillo mide 17,7 y a `masCerca` el ojo queda por encima de 70. */
 export const ALTURA_MINIMA_DEL_OJO_DEL_BURGO = 12;
@@ -197,8 +198,42 @@ export const AIRE_ALREDEDOR_DE_LA_CAJA = 8;
 /** Lo más que se corre la mirada de lado, en lados del tablero; y arriba o abajo, en la mitad. */
 export const CORRIMIENTO_DE_LA_SALIDA = { deLado: 1, arribaOAbajo: 0.3 } as const;
 
-/** ¿Deja esta cercanía todas las casillas fuera de la caja y, si se pide, las cuatro esquinas del anillo en el lienzo? */
-export function elAnilloSeVeJuntoALaCaja(cercania: Cercania, ventana: Ventana, caja: RectanguloEnPuntos, conLasEsquinas: boolean): boolean {
+/**
+ * ═══ Y NO SÓLO LA CAJA: LO QUE EL CLIENTE PINTA ENCIMA DEL LIENZO (27-sep-2026) ═══
+ *
+ * La cuenta de arriba sólo sabía de la caja, y el lienzo tiene más cosas encima: la cinta de arriba a
+ * todo el ancho, y las cámaras debajo de ella. Medido con el fotógrafo (`docs/PANTALLAS.md`) en un
+ * móvil tumbado de 844 × 390, la pose de salida dejaba la esquina de arriba del anillo en y = 29, o sea
+ * DEBAJO de los 44 puntos de la cinta, y el canto de la izquierda bajo «La mesa · Al hombro · Sus
+ * ojos»; en un portátil de 1.366 × 768, igual. Las cuatro esquinas «caben en el lienzo» y el tablero
+ * no se ve entero.
+ *
+ * Así que el cliente pasa esos rectángulos (`estorbos`, en puntos del lienzo) y cuentan como la caja:
+ * ninguna casilla puede caer detrás de ellos, y con estorbos las cuatro esquinas tampoco. Sin
+ * estorbos todo es exactamente lo de antes.
+ *
+ * ═══ Y PARA ESO HACE FALTA RETIRARSE MÁS QUE UN 5 % ═══
+ *
+ * En un teléfono tumbado lo que queda libre entre la cinta y el pie es menos alto que el anillo a la
+ * distancia de salida: correr la mirada no basta, hay que alejar el ojo. Se prueba de menos a más,
+ * de 0,05 en 0,05, hasta `RETIRO_MAXIMO_DE_LA_SALIDA`, y alejarse sigue siendo lo que más cuesta: sólo
+ * gana cuando correr la mirada no encuentra nada. Por eso `masLejos` es 1,6 y no 1,25: la pose de
+ * salida no puede quedar más allá del tope del pellizco, o al primer gesto la cámara saltaría.
+ */
+export const RETIRO_MAXIMO_DE_LA_SALIDA = 0.35;
+
+function dentroDe(q: { readonly x: number; readonly y: number }, r: RectanguloEnPuntos, aire: number): boolean {
+  return q.x >= r.x0 - aire && q.x <= r.x1 + aire && q.y >= r.y0 - aire && q.y <= r.y1 + aire;
+}
+
+/** ¿Deja esta cercanía todas las casillas fuera de la caja (y de los estorbos) y, si se pide, las cuatro esquinas del anillo en el lienzo y fuera de los estorbos? */
+export function elAnilloSeVeJuntoALaCaja(
+  cercania: Cercania,
+  ventana: Ventana,
+  caja: RectanguloEnPuntos,
+  conLasEsquinas: boolean,
+  estorbos: readonly RectanguloEnPuntos[] = [],
+): boolean {
   const { ancho, alto } = ventana;
   if (!(ancho > 0 && alto > 0)) return false;
   const pose = poseDelBurgo(cercania, MIRADOR_DEL_BURGO, ventana);
@@ -210,7 +245,10 @@ export function elAnilloSeVeJuntoALaCaja(cercania: Cercania, ventana: Ventana, c
   if (conLasEsquinas) {
     for (const [x, z] of [[MEDIO_LADO, MEDIO_LADO], [-MEDIO_LADO, MEDIO_LADO], [-MEDIO_LADO, -MEDIO_LADO], [MEDIO_LADO, -MEDIO_LADO]] as const) {
       const q = enElLienzo(x, z);
-      if (q === null || q.x < 0 || q.x > ancho || q.y < 0 || q.y > alto) return false;
+      /* Con estorbos, las esquinas también llevan su aire contra los cantos: si no, la de la izquierda queda cortada a ras. */
+      const borde = estorbos.length > 0 ? AIRE_ALREDEDOR_DE_LA_CAJA : 0;
+      if (q === null || q.x < borde || q.x > ancho - borde || q.y < borde || q.y > alto - borde) return false;
+      for (const e of estorbos) if (dentroDe(q, e, borde)) return false;
     }
   }
   const aire = AIRE_ALREDEDOR_DE_LA_CAJA;
@@ -219,16 +257,19 @@ export function elAnilloSeVeJuntoALaCaja(cercania: Cercania, ventana: Ventana, c
     const hondo = m.fuera.x * m.centro.x + m.fuera.z * m.centro.z;
     for (const k of [BORDE_INTERIOR - hondo, 0, MEDIO_LADO - hondo]) {
       const q = enElLienzo(m.centro.x + m.fuera.x * k, m.centro.z + m.fuera.z * k);
-      if (q !== null && q.x >= caja.x0 - aire && q.x <= caja.x1 + aire && q.y >= caja.y0 - aire && q.y <= caja.y1 + aire) return false;
+      if (q === null) continue;
+      if (dentroDe(q, caja, aire)) return false;
+      for (const e of estorbos) if (dentroDe(q, e, 0)) return false;
     }
   }
   return true;
 }
 
-export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnPuntos | null): Cercania {
+export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnPuntos | null, estorbos: readonly RectanguloEnPuntos[] = []): Cercania {
   const base = poseDeSalida(ventana);
   if (caja === null || !Number.isFinite(caja.x0) || !(ventana.ancho > 0 && ventana.alto > 0)) return base;
-  if (elAnilloSeVeJuntoALaCaja(base, ventana, caja, false)) return base;
+  const hayEstorbos = estorbos.length > 0;
+  if (elAnilloSeVeJuntoALaCaja(base, ventana, caja, hayEstorbos, estorbos)) return base;
   /* La derecha de la pantalla, en el suelo: correr la mirada hacia ella lleva el anillo a la izquierda. */
   const pose = poseDelBurgo(base, MIRADOR_DEL_BURGO, ventana);
   const frente = { x: pose.objetivo.x - pose.posicion.x, z: pose.objetivo.z - pose.posicion.z };
@@ -236,12 +277,17 @@ export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnP
   const derecha = { x: -frente.z / largo, z: frente.x / largo };
   const haciaElOjo = { x: -frente.x / largo, z: -frente.z / largo };
   const candidatas: { readonly cercania: Cercania; readonly coste: number }[] = [];
-  const pasosDeLado = Math.round(50 * CORRIMIENTO_DE_LA_SALIDA.deLado);
-  const pasosArriba = Math.round(50 * CORRIMIENTO_DE_LA_SALIDA.arribaOAbajo);
+  /* Con estorbos, un cuarto de lado más: en un móvil tumbado con carril hace falta 1,05 (medido). El tope del arrastre sigue mandando. */
+  const pasosDeLado = Math.round(50 * CORRIMIENTO_DE_LA_SALIDA.deLado * (hayEstorbos ? 1.25 : 1));
+  /* Y tres veces más arriba o abajo: en un teléfono estrecho de pie, entre la caja y el pie, hace falta 0,45 (barrido en Node). */
+  const pasosArriba = Math.round(50 * CORRIMIENTO_DE_LA_SALIDA.arribaOAbajo * (hayEstorbos ? 3 : 1));
   const tope = ALCANCE_DEL_BURGO * APARTE_MAXIMO;
+  /* Sin estorbos, como siempre: un 5 % como mucho. Con ellos, hasta `RETIRO_MAXIMO_DE_LA_SALIDA`. */
+  const retiros: number[] = [0, 0.05];
+  if (hayEstorbos) for (let r = 0.1; r <= RETIRO_MAXIMO_DE_LA_SALIDA + 1e-9; r += 0.05) retiros.push(Math.round(r * 100) / 100);
   for (let lado = -pasosDeLado; lado <= pasosDeLado; lado++) {
     for (let arriba = -pasosArriba; arriba <= pasosArriba; arriba++) {
-      for (const retiro of [0, 0.05]) {
+      for (const retiro of retiros) {
         const l = (lado / 50) * MEDIO_LADO;
         const s = (arriba / 50) * MEDIO_LADO;
         const centro = { x: base.centro.x + derecha.x * l + haciaElOjo.x * s, z: base.centro.z + derecha.z * l + haciaElOjo.z * s };
@@ -254,7 +300,9 @@ export function poseDeSalidaAlLadoDeLaCaja(ventana: Ventana, caja: RectanguloEnP
     }
   }
   candidatas.sort((a, b) => a.coste - b.coste);
-  for (const c of candidatas) if (elAnilloSeVeJuntoALaCaja(c.cercania, ventana, caja, true)) return c.cercania;
+  for (const c of candidatas) if (elAnilloSeVeJuntoALaCaja(c.cercania, ventana, caja, true, estorbos)) return c.cercania;
+  /* Con estorbos y sin pose que los salve a todos, al menos la de la caja sola: es la de antes. */
+  if (hayEstorbos) return poseDeSalidaAlLadoDeLaCaja(ventana, caja);
   return base;
 }
 

@@ -358,6 +358,9 @@ import { gestoAlSalir, senaladoTrasElGesto } from './tipos';
 import type { CasillaEn3D, FiguraEn3D, GestoDeSenalado, PropsDelBurgo } from './tipos';
 import { NIEBLA_A_PIE, UMBRALES_A_PIE, asientoQueAnda, modoDelPaseoDe, sitioDeNacerEnElBurgo, sueloDelBurgo } from './a-pie';
 import { usarElPaseo } from '../paseo/usar-el-paseo';
+import { indiceDeEstorbos } from '../paseo/estorbos';
+import { rodajasDelCatalogo } from '../paseo/rodajas-del-catalogo';
+import { estorbosDelBurgo } from './estorbos-del-burgo';
 import { QuienAnda } from '../paseo/quien-anda';
 import { usarElCanal } from '../paseo/usar-el-canal';
 import { LosDemas } from '../paseo/los-demas';
@@ -1320,9 +1323,20 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const campoDeLaCamara = useThree((s) => (s.camera as THREE.PerspectiveCamera).fov);
   const esquinaDeLaBandeja = props.bandejaDeLosDados?.esquina ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.esquina;
   const margenDeLaBandeja = props.bandejaDeLosDados?.margen ?? SITIO_DE_LA_BANDEJA_POR_DEFECTO.margen;
+  /* Lo que la aparta de los mandos de un teléfono a pie (ver `SitioDeLaBandeja`): sin ellos, lo de siempre. */
+  const apartadoVertical = props.bandejaDeLosDados?.apartadoVertical;
+  const apartadoDerecho = props.bandejaDeLosDados?.apartadoDerecho;
+  const anchoMaximoDeLaBandeja = props.bandejaDeLosDados?.anchoMaximo;
   const poseDeLaBandejaEnPantalla = useMemo(
-    () => poseDeLaBandeja(Math.max(1, tamanoDelLienzo.width), Math.max(1, tamanoDelLienzo.height), campoDeLaCamara, { esquina: esquinaDeLaBandeja, margen: margenDeLaBandeja }),
-    [tamanoDelLienzo.width, tamanoDelLienzo.height, campoDeLaCamara, esquinaDeLaBandeja, margenDeLaBandeja],
+    () =>
+      poseDeLaBandeja(Math.max(1, tamanoDelLienzo.width), Math.max(1, tamanoDelLienzo.height), campoDeLaCamara, {
+        esquina: esquinaDeLaBandeja,
+        margen: margenDeLaBandeja,
+        apartadoVertical,
+        apartadoDerecho,
+        anchoMaximo: anchoMaximoDeLaBandeja,
+      }),
+    [tamanoDelLienzo.width, tamanoDelLienzo.height, campoDeLaCamara, esquinaDeLaBandeja, margenDeLaBandeja, apartadoVertical, apartadoDerecho, anchoMaximoDeLaBandeja],
   );
   const forma = poseDeLaBandejaEnPantalla.forma;
   const plano = useMemo(() => planoDeLaBandeja(forma), [forma]);
@@ -1537,6 +1551,15 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
   const naceQuienAnda = useMemo(() => (mundoAPie === null ? null : sitioDeNacerEnElBurgo(mundoAPie.nace, tablero.figuras, quienAnda)), [mundoAPie, tablero.figuras, quienAnda]);
   const alturaDelSuelo = useMemo(() => (aPie ? sueloDelBurgo(ciudad) : SIN_SUELO), [aPie, ciudad]);
   /*
+   * LO QUE ESTORBA A LA VISTA: el adorno de la ciudad que se pinta —mobiliario, coches aparcados,
+   * marquesinas…—, medido en el catálogo, para que la cámara de hombro no se quede detrás de una
+   * señal de tráfico (`estorbos-del-burgo.ts`). No choca ni viaja. Una vez por ciudad, y sólo a pie.
+   */
+  const estorbosAPie = useMemo(
+    () => (!aPie || catalogo === null ? null : indiceDeEstorbos(estorbosDelBurgo(ciudad, rodajasDelCatalogo(catalogo)))),
+    [aPie, catalogo, ciudad],
+  );
+  /*
    * ═══ EL CANAL, SÓLO SI LA MESA ES DE BOTAS ═══
    *
    * Lo mismo que en `Lindes.tsx`. Sin la prop no se abre nada y `alDarUnTic` es `undefined`: una
@@ -1555,6 +1578,7 @@ export function Burgo(props: PropsDelBurgo): JSX.Element {
     modo: modoDelPaseo,
     mandos: props.mandos,
     alturaEn: alturaDelSuelo,
+    estorbos: estorbosAPie,
     alDarUnTic: elCanal.alDarUnTic,
     caido: elCanal.caido,
   });

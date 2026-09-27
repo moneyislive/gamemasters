@@ -329,6 +329,7 @@ import {
   sentadosDe as sentadosDeLosMomentos,
 } from '../src/banco-hoja-burgo';
 import type { MomentoDelBanco } from '../src/banco-hoja-burgo';
+import { estaAPantallaCompleta, hayPantallaCompleta, pedirPantallaCompleta } from '../src/pantalla-completa';
 
 /**
  * EL FUENTE SIN SUS COMENTARIOS, Y POR QUÉ ESTO ESTÁ ARRIBA DEL TODO.
@@ -3942,14 +3943,21 @@ function elAcercamientoDelDelta(): void {
     montaLaComun && /esDeLaInterfaz\(e\)/.test(laCamara),
   );
   comprobar(
-    'hay salida, y es un botón de la Sala con su rótulo, que devuelve `comoAlPrincipio()`',
+    /*
+     * Decía «que devuelve `comoAlPrincipio()`», y desde el 27-sep la salida es la POSE DE SALIDA
+     * de este lienzo (`salidaDelDelta`, el delta entero entre la cinta y la mesa): mirar al centro
+     * dejaba la fila sur detrás de la mesa en los apaisados. La intención es la misma —el botón
+     * vuelve a donde se empezó—, y eso es lo que se mira.
+     */
+    'hay salida, y es un botón de la Sala con su rótulo, que devuelve la pose de salida del lienzo (`salidaDelDelta`), la misma con la que se empieza',
     fuente.includes("'Ver el tablero entero'") &&
-      fuente.includes('comoAlPrincipio()') &&
+      fuente.includes('salidaDelDelta(') &&
+      fuente.includes('alAcercarse(laSalidaDeAhora.current)') &&
       fuente.includes('className="riberas-volver"'),
   );
   comprobar(
-    'y sólo se enseña cuando hace falta: lo decide `estaComoAlPrincipio`',
-    fuente.includes('estaComoAlPrincipio(') && /alPrincipio \? null :/.test(fuente),
+    'y sólo se enseña cuando hace falta: lo decide `esLaSalida`',
+    fuente.includes('esLaSalida(') && /alPrincipio \? null :/.test(fuente),
   );
   comprobar(
     'el botón y la cámara comparten UN acercamiento, o el botón apagaría un zoom que no es el que se ve',
@@ -9320,13 +9328,24 @@ function elCarrilDiceAdondeVa(): void {
    * lo que hay es un botón más al lado.
    */
   const sinLaPuerta = htmlNormal.replace(/<button[^>]*riberas-carril-puerta[\s\S]*?<\/button>/, '');
-  const cuadradosNormales = [
-    ...sinLaPuerta.matchAll(/<span class="riberas-carril-glifo"[^>]*>([^<]*)<\/span>/g),
-  ].map((m) => m[1] as string);
+  /*
+   * DESDE EL 27-SEP UNA LISTA CORTA SE ESCRIBE CON PALABRAS («Tirar los dados»): un «1» a secas en
+   * un teléfono no dice qué hace. El número de orden SIGUE en el cuadrado, delante, en
+   * `.riberas-carril-atajo` —que se esconde con el dedo—, así que lo que aquí se afirma es lo mismo
+   * que antes: cada cuadrado lleva su ordinal, que es su atajo. Se lee de los dos sitios.
+   */
+  const atajosConPalabra = [...sinLaPuerta.matchAll(/<span class="riberas-carril-atajo">([^<]*)<\/span>/g)].map(
+    (m) => m[1] as string,
+  );
+  const cuadradosNormales =
+    atajosConPalabra.length > 0
+      ? atajosConPalabra
+      : [...sinLaPuerta.matchAll(/<span class="riberas-carril-glifo"[^>]*>([^<]*)<\/span>/g)].map((m) => m[1] as string);
   comprobar(
-    'y allí el cuadrado sigue llevando su número de orden, que es el atajo de teclado que el carril anuncia',
+    'y allí el cuadrado sigue llevando su número de orden (delante de la palabra en una lista corta), que es el atajo de teclado que el carril anuncia',
     cuadradosNormales.length > 0 &&
       cuadradosNormales.every((g, i) => g === String(i + 1)) &&
+      (atajosConPalabra.length === 0 || sinLaPuerta.includes('riberas-carril-palabra')) &&
       !sinLaPuerta.includes('riberas-carril-terreno'),
     cuadradosNormales,
   );
@@ -13069,6 +13088,177 @@ function lasClasesQueOtroNombraYLaMemoriaDeLaSeccion(): void {
   }
 }
 
+// ---------------------------------------------------------------------------
+// La Sala en el teléfono: el viewport de verdad, el manifiesto y la pantalla completa
+// ---------------------------------------------------------------------------
+
+/**
+ * ═══ LA SALA EN EL TELÉFONO (`docs/PANTALLAS.md`, 27-sep) ═══
+ *
+ * Hasta el 27-sep `index.html` decía `width=1024` y el teléfono pintaba la Sala como un monitor
+ * encogido a un tercio. Lo que se compra aquí es lo que se rompe EN SILENCIO al tocar el marco común
+ * —que en un monitor se ve igual con y sin ello—:
+ *
+ *   1. El viewport es el del aparato (`width=device-width`) y pinta hasta los bordes
+ *      (`viewport-fit=cover`), y `width=1024` no vuelve.
+ *   2. La pantalla completa sin API —el iPhone—: el manifiesto con `display: fullscreen` y la
+ *      orientación libre, enlazado desde `index.html`, con iconos que EXISTEN en `public/` (un icono
+ *      que no está se lee como verde en un monitor y deja la pantalla de inicio sin icono), y las
+ *      metas de aplicación web de Apple con la barra de estado translúcida.
+ *   3. La pantalla completa con API: `hayPantallaCompleta` y `pedirPantallaCompleta` contra tres
+ *      navegadores de mentira —el de hoy, el de prefijo de Safari y el del iPhone, que no trae
+ *      ninguna— y uno más con la API apagada (un `iframe` sin permiso). El del iPhone NO pinta
+ *      botón: un botón que no hace nada es peor que ninguno.
+ *   4. El botón MONTADO en las cuatro pantallas de juego, contado en el código de cada pintor sin sus
+ *      comentarios —una función correcta que nadie monta es el verde falso de siempre—, y NO en el
+ *      catálogo, el vestíbulo ni el muelle, donde se escribe y el teclado se pelea con el alto.
+ *   5. El marco común en `estilo.css`: `100dvh` detrás de `100vh`, las zonas seguras en la cabecera y
+ *      en `.dentro`, el muelle tumbado repartido a dos columnas, la hoja del muelle a lo ancho en la
+ *      columna estrecha y 44 puntos con el dedo.
+ *
+ * Lo que esto NO compra: cómo se VE. Eso lo mide `scripts/fotografo.mjs` en los diez aparatos.
+ */
+function laSalaEnElTelefono(): void {
+  paso('La Sala en el teléfono: viewport, manifiesto y pantalla completa');
+  const leer = (ruta: string): string => readFileSync(new URL(ruta, import.meta.url), 'utf8');
+
+  // 1 · El viewport
+  const html = leer('../index.html').replace(/<!--[\s\S]*?-->/g, ' ');
+  const viewport = /<meta\s+name="viewport"\s+content="([^"]*)"/.exec(html)?.[1] ?? '';
+  comprobar(
+    'el viewport de la Sala es el del aparato (`width=device-width`) y pinta hasta los bordes (`viewport-fit=cover`): con `width=1024` el teléfono la encogía a un tercio',
+    /width=device-width/.test(viewport) && /viewport-fit=cover/.test(viewport) && !/width=1024/.test(viewport),
+    viewport,
+  );
+
+  // 2 · El manifiesto y las metas de Apple
+  const enlaceAlManifiesto = /<link\s+rel="manifest"\s+href="([^"]*)"/.exec(html)?.[1] ?? '';
+  comprobar(
+    '`index.html` enlaza el manifiesto desde la raíz (Vite le antepone `/sala/`; con `%BASE_URL%` saldría `/sala/sala/`)',
+    enlaceAlManifiesto === '/manifest.webmanifest',
+    enlaceAlManifiesto,
+  );
+  comprobar(
+    'y lleva las metas de aplicación web de Apple, con la barra de estado translúcida: en el iPhone no hay API de pantalla completa para páginas',
+    /<meta\s+name="apple-mobile-web-app-capable"\s+content="yes"/.test(html) &&
+      /<meta\s+name="apple-mobile-web-app-status-bar-style"\s+content="black-translucent"/.test(html),
+  );
+  const enPublico = new Set(readdirSync(new URL('../public/', import.meta.url)));
+  let manifiesto: { display?: string; orientation?: string; start_url?: string; scope?: string; icons?: { src?: string }[] } = {};
+  try {
+    manifiesto = JSON.parse(leer('../public/manifest.webmanifest')) as typeof manifiesto;
+  } catch {
+    /* se queda vacío y las de abajo se ponen rojas diciendo qué falta */
+  }
+  comprobar(
+    'el manifiesto pide pantalla completa y orientación libre, y empieza y se queda en `/sala/`',
+    manifiesto.display === 'fullscreen' && manifiesto.orientation === 'any' && manifiesto.start_url === '/sala/' && manifiesto.scope === '/sala/',
+    { display: manifiesto.display, orientation: manifiesto.orientation, start_url: manifiesto.start_url, scope: manifiesto.scope },
+  );
+  const iconos = (manifiesto.icons ?? []).map((i) => i.src ?? '');
+  const hrefsDeIconos = [...html.matchAll(/<link\s+rel="(?:icon|apple-touch-icon)"\s+href="\/([^"]*)"/g)].map((m) => m[1] ?? '');
+  comprobar(
+    'y cada icono que nombran el manifiesto e `index.html` está de verdad en `public/`',
+    iconos.length > 0 && hrefsDeIconos.length >= 2 && [...iconos, ...hrefsDeIconos].every((s) => enPublico.has(s)),
+    { iconos, hrefsDeIconos, enPublico: [...enPublico] },
+  );
+
+  // 3 · La API, con y sin prefijo, y el iPhone sin ninguna
+  const pedidas: string[] = [];
+  const hoy = {
+    fullscreenEnabled: true,
+    fullscreenElement: null as Element | null,
+    documentElement: {
+      requestFullscreen: (o?: { navigationUI?: string }) => {
+        pedidas.push(`hoy:${o?.navigationUI ?? ''}`);
+        return Promise.resolve();
+      },
+    },
+  };
+  const conPrefijo = {
+    webkitFullscreenEnabled: true,
+    webkitFullscreenElement: null as Element | null,
+    documentElement: {
+      webkitRequestFullscreen: () => {
+        pedidas.push('webkit');
+      },
+    },
+  };
+  const iphone = { documentElement: {} };
+  const sinPermiso = { fullscreenEnabled: false, documentElement: { requestFullscreen: () => Promise.resolve() } };
+  comprobar(
+    'hay pantalla completa con la API de hoy y con la de prefijo de Safari; no la hay en el iPhone ni en un `iframe` sin permiso, y fuera de un navegador tampoco',
+    hayPantallaCompleta(hoy) &&
+      hayPantallaCompleta(conPrefijo) &&
+      !hayPantallaCompleta(iphone) &&
+      !hayPantallaCompleta(sinPermiso) &&
+      !hayPantallaCompleta(undefined),
+  );
+  pedirPantallaCompleta(hoy);
+  pedirPantallaCompleta(conPrefijo);
+  pedirPantallaCompleta(iphone);
+  const yaEsta = { ...hoy, fullscreenElement: {} as Element };
+  pedirPantallaCompleta(yaEsta);
+  comprobar(
+    'se pide con la grafía que haya —la de hoy sin la barra de navegación de Android, o la de prefijo—, en el iPhone no se pide nada y estando ya a pantalla completa no se vuelve a pedir',
+    JSON.stringify(pedidas) === JSON.stringify(['hoy:hide', 'webkit']) && estaAPantallaCompleta(yaEsta) && !estaAPantallaCompleta(hoy),
+    pedidas,
+  );
+
+  // 4 · Montado en las cuatro partidas, y no en lo que se escribe
+  for (const pintor of ['burgo-en-tres.tsx', 'riberas-en-tres.tsx', 'lindes-en-tres.tsx', 'quiebro-en-tres.tsx']) {
+    const codigo = sinComentarios(leer(`../src/${pintor}`));
+    comprobar(
+      `${pintor} monta el botón de pantalla completa (y con él la petición al primer toque de un aparato táctil)`,
+      /import \{ PantallaCompleta \} from '\.\/pantalla-completa';/.test(codigo) && /<PantallaCompleta\b[^>]*\/>/.test(codigo),
+    );
+  }
+  for (const fuera of ['sala.tsx', 'catalogo.tsx', 'muelle.tsx', 'formulario.tsx']) {
+    comprobar(
+      `${fuera} NO monta la pantalla completa: es el catálogo o el vestíbulo, donde se escribe un nombre o un código y el teclado del teléfono se pelea por el alto`,
+      !/<PantallaCompleta\b/.test(sinComentarios(leer(`../src/${fuera}`))),
+    );
+  }
+
+  // 5 · El marco común
+  const hoja = sinComentarios(leer('../src/estilo.css'));
+  const regla = (selector: string): string => {
+    const i = hoja.indexOf(`\n${selector} {`);
+    return i < 0 ? '' : hoja.slice(i, hoja.indexOf('}', i));
+  };
+  comprobar(
+    '`.sala` mide la ventana de verdad (`100dvh`) detrás de `100vh`, que en el móvil incluye la barra del navegador',
+    /min-height:\s*100vh;\s*min-height:\s*100dvh;/.test(regla('.sala')),
+    regla('.sala'),
+  );
+  comprobar(
+    'la cabecera y `.dentro` respetan las zonas seguras de la muesca, que con `viewport-fit=cover` ya no las guarda el navegador',
+    /safe-area-inset-top/.test(regla('.cabecera')) &&
+      /safe-area-inset-left/.test(regla('.cabecera')) &&
+      /safe-area-inset-left/.test(regla('.dentro')) &&
+      /safe-area-inset-bottom/.test(regla('.dentro')),
+  );
+  const tumbado = /@media \(orientation: landscape\) and \(max-height: 540px\) \{([\s\S]*?)\n\}/.exec(hoja)?.[1] ?? '';
+  comprobar(
+    'el muelle tumbado se reparte distinto: la Sala del alto exacto de la ventana, el mundo detrás y el raíl al lado desplazándose solo',
+    /\.sala:has\(> \.muelle\)\s*\{[^}]*height:\s*100dvh/.test(tumbado) &&
+      /\.muelle-escena\s*\{[^}]*position:\s*absolute/.test(tumbado) &&
+      /\.muelle-hoja\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\) min\(/.test(tumbado) &&
+      /\.muelle-rail\s*\{[^}]*overflow-y:\s*auto/.test(tumbado),
+    tumbado.slice(0, 300),
+  );
+  const estrecho = /@media \(max-width: 900px\) \{\s*\.muelle \{([\s\S]*?)\n\}/.exec(hoja)?.[1] ?? '';
+  comprobar(
+    'en la columna estrecha la hoja del muelle va a lo ancho: el `margin: 0 auto` en una columna flexible la encogía a su contenido',
+    /\.muelle-hoja\s*\{[^}]*width:\s*100%/.test(estrecho),
+  );
+  comprobar(
+    'con el dedo, el botón de pantalla completa y los botones cortos del raíl miden 44 puntos',
+    /@media \(pointer: coarse\) \{\s*\.pantalla-completa \{\s*width: 44px;\s*height: 44px;/.test(hoja) &&
+      /@media \(pointer: coarse\) \{\s*\.muelle-rail \.opcion-corta \{\s*min-height: 44px;/.test(hoja),
+  );
+}
+
 elMazoEnLaPantalla();
 elResultadoDeMover();
 losDadosLleganAparte();
@@ -13087,6 +13277,7 @@ elComponedorEnElLienzo();
 lasPiezasDelLienzoYSuBanco();
 elEscritorioDelBurgo();
 lasClasesQueOtroNombraYLaMemoriaDeLaSeccion();
+laSalaEnElTelefono();
 
 console.log('');
 /**
@@ -13189,8 +13380,14 @@ console.log('');
  * Y LA REFRIEGA TRAE CINCO (`laRefriegaEnElEscritorio`: los tres carteles dicen la G sólo con
  * canal, la tecla es la del paseo, y no es de nadie más en los tres escritorios, cada juez con su
  * vacuna), así que el guardia sube cinco. Ninguna sale de un bucle.
+ *
+ * Y LA SALA EN EL TELÉFONO TRAE VEINTE (`laSalaEnElTelefono`: el viewport, el manifiesto y sus
+ * iconos, las metas de Apple, la API de pantalla completa contra cuatro navegadores de mentira, el
+ * botón montado en las cuatro partidas y en ninguna de las cuatro pantallas de escribir, y el marco
+ * común de `estilo.css`), así que el guardia sube veinte. Las ocho de los dos bucles recorren listas
+ * escritas en el bloque, no el azar.
  */
-const COMPROBACIONES_ESCRITAS = 1018;
+const COMPROBACIONES_ESCRITAS = 1038;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   for (const f of fallos) console.log(`   · ${f}`);
   console.error(

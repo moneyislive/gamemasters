@@ -80,6 +80,7 @@ import type { MovimientoDeclarado } from '../../shared/mecanicas/tablero-declara
 import { Formulario, hayAlgoQuePintar } from './formulario';
 import { LimiteDelMundo } from './lienzo-propio';
 import { guardarElVeredicto } from './mesa';
+import { PantallaCompleta } from './pantalla-completa';
 import type { LaMesa } from './mesa';
 import type { LoQueVeElPintor } from './pintores';
 import { opcionesSueltas } from './plan';
@@ -356,6 +357,7 @@ export function QuiebroEnTres({ mesa, tablero, opciones, foco }: LoQueVeElPintor
           {mesa.aviso}
         </p>
       ) : null}
+      <PantallaCompleta flotante="derecha" />
     </div>
   );
 }

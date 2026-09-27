@@ -280,6 +280,9 @@ import type { CaminoEn3D, ColorDeJugador, DeltaEn3D, IslaEn3D, PiezaEn3D } from 
  * `verify:escena` la mida; el componente, en `andar-por-el-delta.tsx`.
  */
 import { AndarPorElDelta } from './andar-por-el-delta';
+import { estorbosDelDelta } from './estorbos-del-delta';
+import { indiceDeEstorbos } from './paseo/estorbos';
+import { rodajasDelCatalogo } from './paseo/rodajas-del-catalogo';
 import type { ModoDeCamaraDelDelta } from './delta-a-pie';
 import type { Traer } from './embarcadero/tipos';
 import type { MandosDeFuera } from './paseo/mandos';
@@ -4378,6 +4381,17 @@ export function Delta({
     return { suelo, cosas, caserio, plazas };
   }, [datos.islas, relieve, red]);
 
+  /*
+   * LO QUE ESTORBA A LA VISTA, A PIE: el adorno del plan con las rodajas medidas en el catálogo que
+   * se pinta, para que la cámara de hombro no se quede detrás de un pino (`estorbos-del-delta.ts`).
+   * No choca ni viaja. Una vez por plan y catálogo, y sólo a pie: en la mesa no hay cámara de hombro.
+   */
+  const aPieEnElDelta = camara !== undefined && camara.modo !== 'mesa';
+  const estorbosAPie = useMemo(
+    () => (aPieEnElDelta ? indiceDeEstorbos(estorbosDelDelta(plan.cosas, plan.caserio, rodajasDelCatalogo(modelos))) : null),
+    [aPieEnElDelta, plan, modelos],
+  );
+
   /**
    * LAS GEOMETRÍAS DE SUELO, una por pieza y bioma, y sólo las que se usan.
    *
@@ -4849,6 +4863,7 @@ export function Delta({
           mandos={mandos}
           canal={canal}
           alRecoger={alRecoger}
+          estorbos={estorbosAPie}
         />
       ) : null}
     </group>

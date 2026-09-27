@@ -38,7 +38,7 @@ import {
   verticesDe,
   verticesDeArista,
 } from '../../shared/mecanicas/malla-hexagonal';
-import type { Punto } from '../../shared/mecanicas/malla-hexagonal';
+import type { Hex, Punto } from '../../shared/mecanicas/malla-hexagonal';
 import {
   colorDelBien,
   colorDeTerreno,
@@ -383,6 +383,15 @@ import { deNumero } from '../../shared/mecanicas/fijo';
 import { nacerEnElPaseo } from '../paseo/paseante';
 import { camaraDeHombro } from '../paseo/camaras';
 import { RADIO_DEL_DISCO } from '../presupuesto-del-delta';
+import {
+  SALIDA_MAS_CERCA,
+  anchoDeLaManoQuieta,
+  esLaSalida,
+  proyectarDesdeLaMesa,
+  salidaDelDelta,
+  siluetaDelDelta,
+  techoDeLaBarra,
+} from '../salida-del-delta';
 
 let hechas = 0;
 const fallos: string[] = [];
@@ -10844,6 +10853,61 @@ paso(
   );
 }
 
+/*
+ * ═══ LA POSE DE SALIDA DEL DELTA: ENTERO ENTRE LA CINTA Y LA MESA, EN LOS DIEZ APARATOS ═══
+ *
+ * Con el fotógrafo, el 27-sep: mirando al centro desde la distancia de siempre, en 844×390 la
+ * costa sur del delta caía a 495 puntos de un lienzo de 390 —detrás de la mesa y fuera de la
+ * pantalla— y en 360×640 el delta medía el 70 % del ancho. `salidaDelDelta` (ver su cabecera) lo
+ * encaja; aquí se proyecta con su misma cámara en los diez aparatos de `scripts/fotografo.mjs` y
+ * se exige que quepa, y la pose vieja hace de caso envenenado.
+ */
+paso('La pose de salida encaja el delta entero entre la cinta y la mesa, de pie y tumbado');
+{
+  const delta19: Hex[] = [];
+  for (let q = -2; q <= 2; q++) for (let r = -2; r <= 2; r++) if (Math.abs(q + r) <= 2) delta19.push({ q, r });
+  let suAlcance = RADIO_DE_COMARCA;
+  for (const h of delta19) {
+    const c = centroDeHex(h, RADIO_DE_COMARCA);
+    suAlcance = Math.max(suAlcance, Math.hypot(c.x, c.y) + RADIO_DE_COMARCA);
+  }
+  const CINTA = 52;
+  const aparatos: [number, number][] = [
+    [360, 640], [375, 667], [390, 844], [412, 915], [844, 390], [915, 412], [768, 1024], [1024, 768], [1366, 768], [1920, 1080],
+  ];
+  const cajaDe = (c: { factor: number; centro: { x: number; z: number } }, ancho: number, alto: number) => {
+    const ps = proyectarDesdeLaMesa(siluetaDelDelta(delta19), c, suAlcance, { ancho, alto });
+    return {
+      izq: Math.min(...ps.map((p) => p.x)),
+      der: Math.max(...ps.map((p) => p.x)),
+      sup: Math.min(...ps.map((p) => p.y)),
+      inf: Math.max(...ps.map((p) => p.y)),
+    };
+  };
+  const malos: string[] = [];
+  let delPie = 0;
+  for (const [ancho, alto] of aparatos) {
+    const s = salidaDelDelta(delta19, suAlcance, { ancho, alto, arriba: CINTA, arribaSiCabe: 96, conManos: true });
+    const k = cajaDe(s, ancho, alto);
+    const techo = techoDeLaBarra({ ancho, alto });
+    /* Tumbado y bajo cabe al tope de la rueda: se le deja un punto de tolerancia por el redondeo. */
+    if (!(s.factor >= SALIDA_MAS_CERCA - 1e-9 && s.factor <= MAS_LEJOS + 1e-9)) malos.push(`${ancho}×${alto}: factor ${s.factor}`);
+    if (k.izq < 0 || k.der > ancho - anchoDeLaManoQuieta(alto) + 1 || k.sup < CINTA - 1 || k.inf > techo + 1) {
+      malos.push(`${ancho}×${alto}: x ${k.izq.toFixed(0)}–${k.der.toFixed(0)}, y ${k.sup.toFixed(0)}–${k.inf.toFixed(0)}, barra ${techo.toFixed(0)}`);
+    }
+    if (alto > ancho) delPie += (k.der - k.izq) / ancho;
+    if (!esLaSalida(salidaDelDelta(delta19, suAlcance, { ancho, alto, arriba: CINTA, arribaSiCabe: 96, conManos: true }), s)) malos.push(`${ancho}×${alto}: no es determinista`);
+  }
+  comprobar('en los diez aparatos el delta entero cae entre la cinta, la barra y la mano de bienes', malos.length === 0, malos);
+  comprobar('y de pie se lleva más del 75 % del ancho de media (con la pose vieja, el 72 %)', delPie / 5 > 0.75, delPie / 5);
+  const vieja = cajaDe({ factor: 1, centro: { x: 0, z: 0 } }, 844, 390);
+  comprobar(
+    'caso envenenado: mirando al centro desde la distancia de siempre, en 844×390 la costa sur se sale por abajo',
+    vieja.inf > 390,
+    vieja,
+  );
+}
+
 
 console.log('');
 if (fallos.length > 0) {
@@ -10889,8 +10953,10 @@ if (fallos.length > 0) {
  * Las treinta y seis nuevas son llamadas sueltas —cada regla con su caso envenenado cuenta
  * dos— y ninguna vive en un bucle ni detrás de un `if`, así que el número no baila. Corrido dos
  * veces seguidas, 576 las dos.
+ *
+ * Y CON LA POSE DE SALIDA DEL DELTA SE HACEN 579: tres llamadas sueltas, ninguna en un bucle.
  */
-const COMPROBACIONES_ESCRITAS = 576;
+const COMPROBACIONES_ESCRITAS = 579;
 if (hechas < COMPROBACIONES_ESCRITAS) {
   console.error(
     `Solo se han hecho ${hechas} de las ${COMPROBACIONES_ESCRITAS} comprobaciones que ` +

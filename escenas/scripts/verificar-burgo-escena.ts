@@ -1817,6 +1817,35 @@ paso('Las cuatro esquinas, el suelo, el campo y el recinto de la ciudad');
         return true;
       })(),
     );
+    /*
+     * ── Y TAMPOCO DETRÁS DE LA CINTA NI DE LAS CÁMARAS (27-sep-2026) ── Medido con el fotógrafo en un
+     * móvil tumbado: la esquina de arriba del anillo quedaba debajo de la cinta de 44 puntos. Con los
+     * estorbos que el escritorio mide —la cinta, las cámaras abajo a la izquierda y el hueco del carril—
+     * la pose de salida deja las cuatro esquinas y las cuarenta casillas fuera de todos ellos.
+     */
+    const conEstorbos = [[844, 390], [915, 412], [1366, 768], [1024, 768], [1920, 1080]] as const;
+    const estorbosDe = (ancho: number, alto: number): { x0: number; y0: number; x1: number; y1: number }[] => [
+      { x0: 0, y0: 0, x1: ancho, y1: 44 },
+      alto < 480 ? { x0: 12, y0: alto - 56, x1: 282, y1: alto - 12 } : { x0: 12, y0: 60, x1: 282, y1: 148 },
+      { x0: ancho / 2 - 78, y0: 44, x1: ancho / 2 + 78, y1: 88 },
+    ];
+    const tapadosPorEstorbos = conEstorbos
+      .filter(([ancho, alto]) => {
+        const ventana = { ancho, alto, franjaInferior: 0 };
+        const caja = poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
+        const estorbos = estorbosDe(ancho, alto);
+        return !elAnilloSeVeJuntoALaCaja(poseDeSalidaAlLadoDeLaCaja(ventana, caja, estorbos), ventana, caja, true, estorbos);
+      })
+      .map(([ancho, alto]) => `${String(ancho)}×${String(alto)}`);
+    comprobar('con la cinta, las cámaras y el hueco del carril de estorbos, la pose de salida deja el anillo entero a la vista en cinco lienzos (dos móviles tumbados)', tapadosPorEstorbos.length === 0, tapadosPorEstorbos);
+    {
+      const ventana = { ancho: 844, alto: 390, franjaInferior: 0 };
+      const caja = poseDeLaBandeja(844, 390, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: MARGEN }).rectangulo;
+      comprobar(
+        'se ve fallar: sin estorbos, en 844 × 390 la esquina de arriba del anillo cae debajo de la cinta',
+        !elAnilloSeVeJuntoALaCaja(poseDeSalidaAlLadoDeLaCaja(ventana, caja), ventana, caja, true, estorbosDe(844, 390)),
+      );
+    }
     const movilesDePie = [[375, 812], [412, 915]] as const;
     comprobar(
       'en un móvil en vertical, con la caja arriba, la pose de salida es la de siempre',
@@ -3272,8 +3301,15 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   const fuenteDelCliente = (f: string): string => sinComentarios(fs.readFileSync(path.join(RAIZ, f), 'utf8'));
   const elEscritorio = fuenteDelCliente('../escritorio/src/burgo-en-tres.tsx');
   const laApp = fuenteDelCliente('../app/src/arcade/burgo-en-tres-escena.tsx');
+  /*
+   * El sitio puede ir por una variable (`sitioDeLaBandeja`) desde el 27-sep-2026: a pie en un teléfono
+   * el cliente aparta la caja de la palanca y de los botones (`sitioDeLaBandejaAPie`). Pero en la mesa
+   * sigue siendo `SITIO_DE_LA_BANDEJA`, y eso es lo que se pide: que la variable caiga a él.
+   */
   const ponenLaBandeja = (codigo: string, esquina: string): boolean =>
-    /bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/.test(codigo) && new RegExp(`const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = \\{ esquina: '${esquina}', margen: \\d+ \\}`).test(codigo);
+    (/bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/.test(codigo) ||
+      (/bandejaDeLosDados=\{sitioDeLaBandeja\}/.test(codigo) && /const sitioDeLaBandeja = useMemo\([\s\S]{0,400}?: SITIO_DE_LA_BANDEJA,/.test(codigo))) &&
+    new RegExp(`const SITIO_DE_LA_BANDEJA: SitioDeLaBandeja = \\{ esquina: '${esquina}', margen: \\d+ \\}`).test(codigo);
   comprobar(
     'el escritorio pone la caja abajo a la derecha y el cartel del pie se para antes de ella si al lado cabe uno que se lea; la app, arriba a la derecha, con «Ver el burgo entero» debajo',
     ponenLaBandeja(elEscritorio, 'abajo-derecha') &&
@@ -3281,10 +3317,16 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
       /poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)/.test(elEscritorio) &&
       /< ANCHO_MINIMO_DEL_CARTEL_AL_LADO\) return EL_SITIO_DEL_CARTEL;/.test(elEscritorio) &&
       ponenLaBandeja(laApp, 'arriba-derecha') &&
-      /poseDeLaBandeja\(medida\.ancho, medida\.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA\)\.rectangulo/.test(laApp) &&
+      /*
+       * El encuadre de la app mide la caja de la MESA, que en un teléfono estrecho se para en el 62 % del
+       * ancho (27-sep-2026) y si no es `SITIO_DE_LA_BANDEJA`: se pide que caiga a él.
+       */
+      (/poseDeLaBandeja\(medida\.ancho, medida\.alto, CAMPO_DE_LA_CAMARA, SITIO_DE_LA_BANDEJA\)\.rectangulo/.test(laApp) ||
+        (/poseDeLaBandeja\(medida\.ancho, medida\.alto, CAMPO_DE_LA_CAMARA, sitioDeLaBandejaEnLaMesa\)\.rectangulo/.test(laApp) &&
+          /const sitioDeLaBandejaEnLaMesa = useMemo\([\s\S]{0,300}?: SITIO_DE_LA_BANDEJA\)/.test(laApp))) &&
       /style=\{\[estilos\.volver, \{ top: alturaDelBotonDeVolver \}\]\}/.test(laApp),
   );
-  comprobar('se ve fallar: una app que no pasa el sitio de la caja cae', !ponenLaBandeja(laApp.replace(/bandejaDeLosDados=\{SITIO_DE_LA_BANDEJA\}/, ''), 'arriba-derecha'));
+  comprobar('se ve fallar: una app que no pasa el sitio de la caja cae', !ponenLaBandeja(laApp.replace(/bandejaDeLosDados=\{(?:SITIO_DE_LA_BANDEJA|sitioDeLaBandeja)\}/, ''), 'arriba-derecha'));
   {
     /* En los lienzos de la completa, al lado de la caja cabe siempre un cartel de 220 puntos: sólo en los estrechos va a lo ancho. */
     const alLado = (ancho: number, alto: number): number => poseDeLaBandeja(ancho, alto, CAMPO_DE_LA_CAMARA, { esquina: 'abajo-derecha', margen: 12 }).rectangulo.x0 - 2 * 12;
@@ -3309,9 +3351,10 @@ paso('Los dos .tsx de la escena y el tinte: lo que se puede medir sin abrir un l
   comprobar('se ve fallar: una app que no pasa el reloj cae', !llevanElReloj(laApp.replace('reloj={relojDeArena}', '')));
   /* Y LOS DOS CLIENTES SALEN CON LA POSE QUE NO SE ESCONDE DETRÁS DE LA CAJA, y ninguno con la de siempre. */
   const salenAlLadoDeLaCaja = (escritorio: string, app: string): boolean =>
-    /poseDeSalidaAlLadoDeLaCaja\(\{ ancho: lienzo\.ancho, alto: lienzo\.alto, franjaInferior: 0 \}, poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)\.rectangulo\)/.test(escritorio) &&
+    /* Con los estorbos detrás o sin ellos (27-sep-2026: la cinta, las cámaras y el pie también tapan). */
+    /poseDeSalidaAlLadoDeLaCaja\(\{ ancho: lienzo\.ancho, alto: lienzo\.alto, franjaInferior: 0 \}, poseDeLaBandeja\(lienzo\.ancho, lienzo\.alto, FOV, SITIO_DE_LA_BANDEJA\)\.rectangulo(?:, estorbos)?\)/.test(escritorio) &&
     !/\bposeDeSalida\(/.test(escritorio) &&
-    (app.match(/poseDeSalidaAlLadoDeLaCaja\(ventana, rectanguloDeLaCaja\)/g) ?? []).length === 2 &&
+    (app.match(/poseDeSalidaAlLadoDeLaCaja\(ventana, rectanguloDeLaCaja(?:, estorbos)?\)/g) ?? []).length === 2 &&
     !/\bposeDeSalida\(/.test(app);
   comprobar('el escritorio y la app salen, y vuelven con «Ver el burgo entero», a la pose que no deja casillas detrás de la caja', salenAlLadoDeLaCaja(elEscritorio, laApp));
   comprobar('se ve fallar: un escritorio que vuelve a la pose de salida de siempre cae', !salenAlLadoDeLaCaja(elEscritorio.replace('poseDeSalidaAlLadoDeLaCaja({', 'poseDeSalida({'), laApp));

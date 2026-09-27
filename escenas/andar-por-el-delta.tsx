@@ -62,6 +62,7 @@ import { LosDemas } from './paseo/los-demas';
 import { LosHallazgos } from './paseo/los-hallazgos';
 import type { MandosDeFuera } from './paseo/mandos';
 import type { CanalDeBotas } from './paseo/mesa-de-botas';
+import type { EstorbosDelPaseo } from './paseo/estorbos';
 import { QuienAnda } from './paseo/quien-anda';
 import { usarElCanal } from './paseo/usar-el-canal';
 import { usarElPaseo } from './paseo/usar-el-paseo';
@@ -95,9 +96,14 @@ export interface AndarPorElDeltaProps {
   readonly canal?: CanalDeBotas;
   /** Alguien ha recogido un hallazgo: la prop `alRecoger` de la escena del delta, tal cual. */
   readonly alRecoger?: (r: { readonly por: string; readonly clase: string; readonly mio: boolean }) => void;
+  /**
+   * LO QUE ESTORBA A LA VISTA: el adorno del delta, ya indexado (`estorbos-del-delta.ts`). La cámara
+   * de hombro no se queda detrás de él; no choca ni viaja. Sin él, sólo la arena, como antes.
+   */
+  readonly estorbos?: EstorbosDelPaseo | null;
 }
 
-export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal, alRecoger }: AndarPorElDeltaProps): JSX.Element | null {
+export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos, canal, alRecoger, estorbos }: AndarPorElDeltaProps): JSX.Element | null {
   const aPie = camara.modo !== 'mesa';
   const asiento = camara.modo === 'mesa' ? '' : camara.asiento;
 
@@ -134,7 +140,7 @@ export function AndarPorElDelta({ relieve, vista, camara, traer, figura, mandos,
    */
   const corregirAQuienPasea = useRef<(sitio: Andante) => void>(() => undefined);
   const elCanal = usarElCanal(canal, corregirAQuienPasea, alRecoger);
-  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic, caido: elCanal.caido });
+  const paseo = usarElPaseo({ mundo, nace, modo: camara.modo, mandos, alturaEn, alDarUnTic: elCanal.alDarUnTic, caido: elCanal.caido, estorbos });
   useEffect(() => {
     corregirAQuienPasea.current = paseo.corregir;
   }, [paseo.corregir]);

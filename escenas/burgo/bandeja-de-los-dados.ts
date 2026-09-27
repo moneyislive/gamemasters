@@ -569,6 +569,19 @@ export interface SitioDeLaBandeja {
   readonly esquina: EsquinaDeLaBandeja;
   /** Lo que se aparta de los dos bordes de su esquina, en puntos del lienzo. */
   readonly margen: number;
+  /**
+   * ═══ A PIE EN UN TELÉFONO, LA CAJA SE APARTA DE LOS MANDOS (27-sep-2026) ═══
+   *
+   * Abajo a la derecha es donde un teléfono lleva «Correr» y «Golpear», y abajo a la izquierda la
+   * palanca: medido con el fotógrafo, a pie en un móvil tumbado el golpe y el correr caían ENCIMA de
+   * los dados y la palanca encima del dinero. Así que el cliente puede apartarla, en puntos y además
+   * del margen: `apartadoVertical` la separa del canto de arriba o de abajo (para ponerla ENCIMA de los
+   * mandos) y `apartadoDerecho` del canto derecho (para ponerla ENTRE la palanca y los botones), y
+   * `anchoMaximo` la para antes de la palanca. Sin ellos, todo es exactamente lo de antes.
+   */
+  readonly apartadoVertical?: number;
+  readonly apartadoDerecho?: number;
+  readonly anchoMaximo?: number;
 }
 
 /** Donde va si el cliente no dice nada: abajo a la derecha, a 12 puntos. */
@@ -792,8 +805,10 @@ export function poseDeLaBandeja(ancho: number, alto: number, campoEnGrados: numb
   const focal = alto / 2 / Math.tan((campoEnGrados * Math.PI) / 360);
   const porPunto = d / focal;
   const caja = cajaDeLaBandeja(forma);
-  const pedido = Math.max(1, Math.min(ancho - 2 * sitio.margen, anchoDeLaBandejaEnPuntos(ancho, alto)));
-  const techo = Math.max(1, Math.min(alto - 2 * sitio.margen, ALTO_DE_LA_BANDEJA_EN_PARTES[forma] * alto));
+  const vertical = Math.max(0, sitio.apartadoVertical ?? 0);
+  const derecho = Math.max(0, sitio.apartadoDerecho ?? 0);
+  const pedido = Math.max(1, Math.min(ancho - 2 * sitio.margen - derecho, sitio.anchoMaximo ?? Infinity, anchoDeLaBandejaEnPuntos(ancho, alto)));
+  const techo = Math.max(1, Math.min(alto - 2 * sitio.margen - vertical, ALTO_DE_LA_BANDEJA_EN_PARTES[forma] * alto));
   let escala = (pedido * porPunto) / (caja.x1 - caja.x0);
   const centro = { x: 0, y: 0, z: -d };
   for (let pasada = 0; pasada < PASADAS_DE_LA_POSE; pasada++) {
@@ -802,8 +817,8 @@ export function poseDeLaBandeja(ancho: number, alto: number, campoEnGrados: numb
     if (!(medido.x1 - medido.x0 > 0) || !(medido.y1 - medido.y0 > 0)) break;
     escala *= Math.min(pedido / (medido.x1 - medido.x0), techo / (medido.y1 - medido.y0));
     const r = rectanguloDeLaBandeja(forma, centro, escala, cabeceo, ancho, alto, campoEnGrados);
-    const faltaX = ancho - sitio.margen - r.x1;
-    const faltaY = sitio.esquina === 'abajo-derecha' ? alto - sitio.margen - r.y1 : sitio.margen - r.y0;
+    const faltaX = ancho - sitio.margen - derecho - r.x1;
+    const faltaY = sitio.esquina === 'abajo-derecha' ? alto - sitio.margen - vertical - r.y1 : sitio.margen + vertical - r.y0;
     centro.x += faltaX * porPunto;
     centro.y -= faltaY * porPunto;
   }

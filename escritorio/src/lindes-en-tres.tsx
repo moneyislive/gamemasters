@@ -54,6 +54,7 @@ import { escudosDeLaVista, LEVA } from '../../shared/arcade/juegos/lindes-escudo
 import { LosEscudos, usarElAvisoDelHallazgo } from './a-pie-en-botas';
 import { LimiteDelMundo } from './lienzo-propio';
 import { COMO_SE_ANDA_CON_EL_DEDO, COMO_SE_GOLPEA_CON_EL_DEDO, MandosTactiles, usarAparatoTactil } from './mandos-tactiles';
+import { PantallaCompleta } from './pantalla-completa';
 import { direccionDelCanal } from './mesa';
 import { traer } from './muelle';
 import type { LoQueVeElPintor } from './pintores';
@@ -109,6 +110,28 @@ export function ComoSeAnda({
   );
 }
 
+/**
+ * CUÁNDO EL RAÍL ES UNA HOJA PLEGABLE: un teléfono de pie. La MISMA consulta que la regla
+ * `@media` de `estilo.css` (busca `LA HOJA PLEGABLE`): si una dijera sí y la otra no, habría asa
+ * sin hoja o hoja sin asa. Sin `matchMedia` —el pintado estático de `verify:escritorio`—, no.
+ */
+export const CONSULTA_DE_LA_HOJA_PLEGABLE = '(max-width: 40rem) and (orientation: portrait)';
+
+function usarLaHojaPlegable(): boolean {
+  const consulta = (): MediaQueryList | null =>
+    typeof globalThis.matchMedia === 'function' ? globalThis.matchMedia(CONSULTA_DE_LA_HOJA_PLEGABLE) : null;
+  const [si, ponerSi] = useState(() => consulta()?.matches ?? false);
+  useEffect(() => {
+    const m = consulta();
+    if (m === null) return undefined;
+    const cambia = (): void => ponerSi(m.matches);
+    cambia();
+    m.addEventListener('change', cambia);
+    return () => m.removeEventListener('change', cambia);
+  }, []);
+  return si;
+}
+
 export function LindesEnTres({
   mesa,
   puesta,
@@ -145,9 +168,11 @@ export function LindesEnTres({
    * `foco` es OPCIONAL porque `verify:escritorio` monta este pintor suelto para medirlo,
    * sin ninguna Sala alrededor.
    */
+  const [recuadro, ponerRecuadro] = useState<HTMLDivElement | null>(null);
   const apuntarElRecuadro = useCallback(
-    (recuadro: HTMLDivElement | null): void => {
-      foco?.(recuadro);
+    (r: HTMLDivElement | null): void => {
+      foco?.(r);
+      ponerRecuadro(r);
     },
     [foco],
   );
@@ -194,6 +219,54 @@ export function LindesEnTres({
   const { alRecoger, aviso } = usarElAvisoDelHallazgo('lindes', puesta.asientos);
 
   /*
+   * ═══ LA FRANJA DE ABAJO, MEDIDA: LO QUE LA PANTALLA PONE ENCIMA DE LOS RINCONES ═══
+   *
+   * La losa de la mano y el reloj van en los rincones de abajo del lienzo, y abajo es también
+   * donde esta pantalla pone la cinta y, a pie en un teléfono, la palanca, «Correr» y «Golpear».
+   * Sentado a una mesa de botas en un móvil (27-sep-2026, `docs/PANTALLAS.md`), LA PALANCA TAPABA
+   * LA LOSA DE LA MANO —el recuadro verde de abajo a la izquierda, que parecía un minimapa— y
+   * «Correr» tapaba el reloj. Se mide lo que sobresale de verdad —la cinta crece a dos renglones
+   * en un teléfono estrecho, y la fila de mandos cambia de forma tumbada— y se le dice a la escena
+   * (`reservaAbajo`), que apoya los rincones encima.
+   */
+  /*
+   * ═══ EN UN TELÉFONO DE PIE, EL RAÍL ES UNA HOJA QUE SE PLIEGA ═══
+   *
+   * De pie el raíl colgaba bajo el lienzo y el valle se quedaba en el 60 % del alto, con la
+   * página desplazándose por los paneles (27-sep-2026, `docs/PANTALLAS.md`). Ahora el valle se
+   * lleva la ventana entera y el raíl es una hoja que sube desde abajo con el asa «Paneles» y se
+   * cierra con «Cerrar». Lo que la jugada necesita en la mesa —«Girar», dónde plantar y las
+   * acciones del turno— se queda FUERA de la hoja, en una tira sobre la cinta (`lindes-jugada`):
+   * no hay que abrir nada para jugar. Tumbado y en pantallas grandes, el raíl de siempre.
+   */
+  const plegable = usarLaHojaPlegable();
+  const [hojaAbierta, ponerHojaAbierta] = useState(false);
+  useEffect(() => {
+    if (!plegable) ponerHojaAbierta(false);
+  }, [plegable]);
+
+  const [reservaAbajo, ponerReservaAbajo] = useState(0);
+  useEffect(() => {
+    if (recuadro === null) return undefined;
+    const medir = (): void => {
+      const abajo = recuadro.getBoundingClientRect().bottom;
+      let alto = 0;
+      for (const e of recuadro.querySelectorAll('.lindes-cinta, .mandos-tactiles > *, .lindes-jugada > *, .lindes-asa')) {
+        const r = e.getBoundingClientRect();
+        if (r.height > 0) alto = Math.max(alto, abajo - r.top);
+      }
+      ponerReservaAbajo((antes) => (Math.abs(antes - alto) < 2 ? antes : Math.round(alto)));
+    };
+    const cuadro = requestAnimationFrame(medir);
+    const mirando = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(medir);
+    mirando?.observe(recuadro);
+    return () => {
+      cancelAnimationFrame(cuadro);
+      mirando?.disconnect();
+    };
+  }, [recuadro, modo, tactil, tablero.aviso, plegable, hojaAbierta, opciones]);
+
+  /*
    * EL CONTROLADOR DE LAS LINDES: la escena, el giro, la calidad, los sitios y lo que manda cada
    * toque, lo mismo que la app. Ver la cabecera de `escenas/lindes/el-valle-en-la-mesa.ts`.
    */
@@ -234,6 +307,28 @@ export function LindesEnTres({
     [tablero, conLosEscudos],
   );
 
+  /*
+   * ═══ LOS PANELES DEL JUEGO, SIN LOS QUE ESTE RAÍL YA DICE MEJOR ═══
+   *
+   * En un teléfono el raíl es la franja de abajo y cada renglón se paga en tablero. Y decía tres
+   * cosas DOS VECES (27-sep-2026, `docs/PANTALLAS.md`): «En la mano» —la ficha de arriba, con su
+   * «Girar», y el panel del juego con los mismos cuatro lados—, «La mesa» —el marcador de la Sala,
+   * con el color y el «(tú)», y el panel con los mismos puntos en texto— y «La bolsa», que el
+   * marcador ya cuenta. Salen los repetidos y sólo cuando el otro está: sin losa en la mano el
+   * panel vuelve, y sin raíl de la Sala alrededor (`elRail`, que trae el marcador) también.
+   * «Cómo quedó», al final, se queda siempre: es el recuento con su porqué.
+   */
+  const conMarcador = elRail !== undefined && elRail !== null;
+  const losPaneles = tablero.paneles.filter(
+    (p) =>
+      !(p.titulo === 'En la mano' && laLosa !== null) &&
+      !((p.titulo === 'La mesa' || p.titulo === 'La bolsa') && conMarcador),
+  );
+
+  /* Lo que la tira de la jugada enseña fuera de la hoja: las acciones que se pueden pulsar ya. */
+  const accionesDeLaJugada = loQueNoEstaArriba.acciones.filter((a) => a.disponible);
+  const hayJugada = laLosa !== null || sitios.length > 0 || accionesDeLaJugada.length > 0;
+
   if (valle.escena === null || valle.roto !== null) {
     return (
       <div className="lindes-respaldo">
@@ -251,7 +346,7 @@ export function LindesEnTres({
       <div className="lindes-lienzo" ref={apuntarElRecuadro}>
         <LimiteDelMundo alFallar={valle.alFallar}>
           <Canvas {...EL_LIENZO_DEL_VALLE} onCreated={alCrearElLienzoDelValle}>
-            <Lindes {...valle.escena} canal={canal} mandos={mandos} alRecoger={alRecoger} />
+            <Lindes {...valle.escena} canal={canal} mandos={mandos} alRecoger={alRecoger} reservaAbajo={reservaAbajo} />
           </Canvas>
         </LimiteDelMundo>
 
@@ -267,6 +362,7 @@ export function LindesEnTres({
         />
 
         <ComoSeAnda modo={modo} canal={esBotas ? (estadoDelCanal?.texto ?? 'Conectando…') : undefined} tactil={tactil} />
+        <PantallaCompleta flotante="izquierda" />
 
         <div className="lindes-camaras" role="group" aria-label="Desde dónde se mira">
           {LAS_CAMARAS_DEL_VALLE.map((c) => (
@@ -282,6 +378,57 @@ export function LindesEnTres({
             </button>
           ))}
         </div>
+
+        {/*
+          LA JUGADA, FUERA DE LA HOJA: sólo en un teléfono de pie, con la hoja cerrada y en la mesa
+          —a pie abajo van la palanca y los botones, y allí se abre «Paneles»—. Lo mismo que la hoja
+          trae arriba, en botones de pulgar: girar la losa, dónde plantar y las acciones del turno.
+        */}
+        {plegable && !hojaAbierta && modo === 'mesa' && hayJugada ? (
+          <div className="lindes-jugada" role="group" aria-label="La jugada">
+            {laLosa !== null ? (
+              <button type="button" className="lindes-jugada-boton" disabled={girosAqui.length < 2 || quieto} onClick={girar}>
+                Girar la losa{girosAqui.length < 2 ? '' : ` (${girosAqui.length})`}
+              </button>
+            ) : null}
+            {sitios.map((s) => (
+              <button
+                key={`${s.clase}:${s.indice}`}
+                type="button"
+                className="lindes-jugada-boton"
+                disabled={quieto}
+                onClick={() => alTocar(s.movimiento)}
+                title={s.ayuda}
+              >
+                {s.rotulo} · {s.cerrada ? `cierra: ${s.valdria}` : `vale ${s.valdria}`}
+              </button>
+            ))}
+            {accionesDeLaJugada.map((a) => (
+              <button
+                key={a.id}
+                type="button"
+                className="lindes-jugada-boton"
+                disabled={quieto}
+                onClick={() => alTocar(a.toque)}
+                title={a.ayuda}
+              >
+                {a.rotulo}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        {plegable ? (
+          <button
+            type="button"
+            className="lindes-asa"
+            aria-expanded={hojaAbierta}
+            aria-controls="lindes-hoja"
+            onClick={() => ponerHojaAbierta((a) => !a)}
+          >
+            Paneles
+          </button>
+        ) : null}
       </div>
 
       {/*
@@ -301,7 +448,34 @@ export function LindesEnTres({
         que hace falta para decidirlo —los paneles que declara el propio juego— y al final
         la chapa de la mesa, que se mira una vez al empezar y casi nunca más.
       */}
-      <aside className="lindes-rail">
+      {/*
+        A PIE, LOS ESCUDOS LO PRIMERO (`lindes-rail-a-pie`, que les da `order: -1`): andando es lo
+        que se recoge y con lo que se paga la leva, y en un teléfono el raíl es una franja estrecha
+        —abajo de pie, al lado tumbado— en la que lo de más abajo no se ve sin desplazarse. En la
+        mesa van donde siempre, tras las acciones. Con CSS y no pintándolos en dos sitios: el
+        mismo nodo, sin remontarse al bajar ni al subir.
+      */}
+      <aside
+        id="lindes-hoja"
+        className={[
+          'lindes-rail',
+          modo === 'mesa' ? '' : 'lindes-rail-a-pie',
+          plegable ? 'lindes-rail-plegable' : '',
+          plegable && hojaAbierta ? 'lindes-rail-abierta' : '',
+        ]
+          .filter((c) => c !== '')
+          .join(' ')}
+      >
+        {/* La hoja abierta tapa el asa: se cierra desde su propia cabecera, que no se desplaza. */}
+        {plegable ? (
+          <div className="lindes-hoja-cabecera">
+            <span>Paneles</span>
+            <button type="button" className="lindes-hoja-cerrar" onClick={() => ponerHojaAbierta(false)}>
+              Cerrar
+            </button>
+          </div>
+        ) : null}
+
         {laLosa !== null ? (
           <section className="lindes-mano">
             <h3>En la mano</h3>
@@ -358,7 +532,7 @@ export function LindesEnTres({
           <LosEscudos vista={puesta.vista} yo={yoEnLaMesa} opciones={opciones} quieto={quieto} mover={mover} />
         ) : null}
 
-        {tablero.paneles.map((p) => (
+        {losPaneles.map((p) => (
           <section key={p.titulo} className="lindes-panel">
             <h3>{p.titulo}</h3>
             <ul role="list">

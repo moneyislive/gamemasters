@@ -130,6 +130,16 @@ export interface PropsDeLasLindes extends PropsDeEscenaDeTablero<ModoDeCamaraDeL
    * Si algún día el lienzo de Las Lindes se hace de pantalla completa con algo encima,
    * esto vuelve, y vuelve porque hará falta y no por simetría.
    */
+  /**
+   * ═══ …Y VOLVIÓ, PERO SÓLO COMO UNA FRANJA ═══
+   *
+   * Lo que el párrafo de arriba anunciaba pasó (27-sep-2026, `docs/PANTALLAS.md`): la cinta de
+   * la Sala y, a pie en un teléfono, la palanca, «Correr» y «Golpear» van ENCIMA del lienzo, y
+   * tapaban los dos rincones —la losa de la mano y el reloj—. `reservaAbajo` son los puntos CSS
+   * de abajo que tapa la pantalla; los rincones se apoyan encima (`rincones.ts`). Opcional: sin
+   * ella, o a cero, la cuenta es la de siempre.
+   */
+  readonly reservaAbajo?: number;
   /** Con qué giro se enseña la losa de la mano mientras se elige dónde ponerla. */
   readonly giroEnMano: Giro;
   /**

@@ -442,8 +442,14 @@ code {
  * es la luz de la sala, y teñirla sería empezar a repartir el color que tiene
  * que estar concentrado en las placas.
  */
+/*
+ * `100dvh` DETRÁS DE `100vh`, y no en su lugar: en el móvil `100vh` es la ventana SIN la barra del
+ * navegador, así que la página medía una barra más que la pantalla y siempre desplazaba ese trozo.
+ * `dvh` es la de verdad en cada momento; un navegador que no lo entienda se queda con la primera.
+ */
 .sala {
   min-height: 100vh;
+  min-height: 100dvh;
   background:
     radial-gradient(70% 34% at 50% 0%, var(--pared) 0%, transparent 72%),
     var(--suelo);
@@ -454,6 +460,13 @@ code {
  * de los 320 que WCAG 1.4.10 pone como suelo: más de una cuarta parte del ancho
  * gastada en margen justo cuando no sobra ninguno. Con `clamp` valen 2,5rem desde
  * los ~1060 px de ventana y bajan a 1rem cuando el hueco aprieta.
+ *
+ * ═══ Y LAS ZONAS SEGURAS, DESDE QUE `index.html` PINTA HASTA LOS BORDES ═══
+ *
+ * Con `viewport-fit=cover` y la barra de estado translúcida del iPhone, la página empieza DEBAJO
+ * de la muesca y, tumbado, a los lados de ella. `env(safe-area-inset-*)` vale cero donde no hay
+ * muesca, así que en un monitor el relleno es el de siempre; con `max()` gana el mayor de los dos
+ * y no se suman. Lo mismo en `.dentro` y en el muelle.
  */
 .cabecera {
   display: flex;
@@ -461,6 +474,9 @@ code {
   flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem clamp(1rem, 4vw, 2.5rem);
+  padding-top: max(1rem, env(safe-area-inset-top));
+  padding-left: max(clamp(1rem, 4vw, 2.5rem), env(safe-area-inset-left));
+  padding-right: max(clamp(1rem, 4vw, 2.5rem), env(safe-area-inset-right));
   background: var(--pared);
   border-bottom: 1px solid var(--filo);
 }
@@ -500,6 +516,9 @@ code {
   max-width: 92rem;
   margin: 0 auto;
   padding: 2rem clamp(1rem, 4vw, 2.5rem) 4rem;
+  padding-left: max(clamp(1rem, 4vw, 2.5rem), env(safe-area-inset-left));
+  padding-right: max(clamp(1rem, 4vw, 2.5rem), env(safe-area-inset-right));
+  padding-bottom: calc(4rem + env(safe-area-inset-bottom));
 }
 
 .titulo {
@@ -1788,6 +1807,7 @@ code {
   --vidrio: rgba(18, 22, 29, 0.78);
   position: relative;
   min-height: calc(100vh - 4.4rem);
+  min-height: calc(100dvh - 4.4rem);
   overflow: hidden;
   background: var(--suelo);
 }
@@ -1854,6 +1874,8 @@ code {
   max-width: 92rem;
   margin: 0 auto;
   padding: 2rem 2.5rem 4rem;
+  padding-left: max(2.5rem, env(safe-area-inset-left));
+  padding-right: max(2.5rem, env(safe-area-inset-right));
   pointer-events: none;
 }
 
@@ -2099,10 +2121,12 @@ code {
     overflow: visible;
   }
 
+  /* `svh`, la ventana CON las barras del navegador: el mundo no crece ni mengua al desplazar. */
   .muelle-escena {
     position: relative;
     flex: none;
     height: 46vh;
+    height: 46svh;
   }
 
   .muelle-falta {
@@ -2110,9 +2134,20 @@ code {
     bottom: 0.75rem;
   }
 
+  /*
+   * `width: 100%` porque `.muelle` es aquí una columna flexible y el `margin: 0 auto` de la hoja,
+   * en una columna flexible, la ENCOGE a lo que mide su contenido: tumbado en 844 el raíl se quedaba
+   * en 547 puntos en medio de la pantalla, y en la tableta igual. Con el tope de 40rem, en la
+   * tableta de pie el raíl no se estira a 730 puntos de botones.
+   */
   .muelle-hoja {
+    width: 100%;
+    max-width: 40rem;
     grid-template-columns: minmax(0, 1fr);
     padding: 1.25rem 1.25rem 3rem;
+    padding-left: max(1.25rem, env(safe-area-inset-left));
+    padding-right: max(1.25rem, env(safe-area-inset-right));
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
   }
 
   .muelle-rail {
@@ -2128,6 +2163,172 @@ code {
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
+}
+
+/*
+ * ═══ EL MÓVIL TUMBADO: EL MUNDO DETRÁS Y EL RAÍL AL LADO, COMO EN EL MONITOR ═══
+ *
+ * Con 390 puntos de alto, la columna de arriba —escena encima, raíl debajo— dejaba la cabecera y
+ * 179 puntos de mundo en la primera pantalla, y el código de la mesa, los sentados y «Repartir el
+ * delta» había que ir a buscarlos desplazando la página, ya sin mundo a la vista. Medido con el
+ * fotógrafo en 844×390 y 915×412. Y por encima de 900 de ancho, con el diseño de monitor, el raíl
+ * tenía de techo `100vh - 10,4rem`: 235 puntos para tres paneles.
+ *
+ * Tumbado se reparte distinto (`docs/PANTALLAS.md` §4.7): la Sala es una columna del alto exacto
+ * de la ventana —la cabecera, más baja, y el muelle con lo que queda—, el mundo a pantalla entera
+ * detrás, el título encima de él y el raíl a la derecha, de vidrio, desplazándose solo dentro de
+ * su alto. Nada de la página rueda: lo que no cabe rueda en el raíl.
+ */
+@media (orientation: landscape) and (max-height: 540px) {
+  .sala:has(> .muelle) {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+  }
+
+  .sala:has(> .muelle) > .cabecera {
+    flex: none;
+    padding-top: max(0.45rem, env(safe-area-inset-top));
+    padding-bottom: 0.45rem;
+  }
+
+  .muelle {
+    display: block;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .muelle-escena {
+    position: absolute;
+    inset: 0;
+    height: auto;
+  }
+
+  .muelle-hoja {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    grid-template-columns: minmax(0, 1fr) min(22rem, 46vw);
+    grid-template-rows: minmax(0, 1fr);
+    gap: 1rem;
+    padding: 0.75rem max(1rem, env(safe-area-inset-right)) max(0.75rem, env(safe-area-inset-bottom))
+      max(1rem, env(safe-area-inset-left));
+  }
+
+  .muelle-hueco .titulo {
+    font-size: 1.5rem;
+    text-shadow: 0 1px 12px rgba(0, 0, 0, 0.55);
+  }
+
+  .muelle-rail {
+    max-height: 100%;
+    overflow-y: auto;
+    padding-right: 0.25rem;
+  }
+
+  .muelle-rail .panel {
+    padding: 0.75rem 1rem;
+    background: var(--vidrio);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  /*
+   * El código y los sentados, más prietos: con el código a 2,2rem y su aire, el panel de la mesa
+   * llenaba él solo el alto del raíl y el botón de empezar quedaba siempre debajo.
+   */
+  .muelle-rail .codigo-grande {
+    font-size: 1.6rem;
+  }
+
+  .muelle-rail .muelle-copias {
+    margin: 0.35rem 0 0.2rem;
+  }
+
+  .muelle-rail .copiado {
+    margin: 0 0 0.3rem;
+  }
+
+  .muelle-rail .muelle-tramo {
+    gap: 0.6rem;
+  }
+}
+
+/*
+ * ═══ CON EL DEDO, 44 PUNTOS ═══
+ *
+ * `.opcion-corta` baja a 2,25rem (38 puntos) para que «Cambiar» y «Copiar código» no pesen en el
+ * raíl de un monitor. Con el dedo eso es fallar el toque: el fotógrafo lo midió en 43 en el móvil.
+ */
+@media (pointer: coarse) {
+  .muelle-rail .opcion-corta {
+    min-height: 44px;
+  }
+}
+
+/*
+ * ═══ EL BOTÓN DE PANTALLA COMPLETA (`pantalla-completa.tsx`) ═══
+ *
+ * Discreto: las cuatro esquinas en `--tenue`, sin acento —no es lo que la partida está esperando—
+ * y el acento sólo al pasar el ratón, como el resto de botones de la Sala (el foco lo pinta
+ * `:focus-visible`). 2,25rem con ratón y 44 puntos con el dedo.
+ *
+ * Dentro de una cinta va SIN caja: la cinta ya es la placa, y una segunda caja dentro de ella se
+ * leía como un botón gordo al lado del «‹» (visto en el Burgo en 360). `flex: none` para que la
+ * frase de al lado, que se recorta, no lo aplaste.
+ *
+ * Suelto (`-flotante`) va sobre el mundo, así que lleva el vidrio y el filo de los mandos del
+ * lienzo, a `0.75rem` del canto como `.riberas-volver` y dentro de las zonas seguras.
+ */
+.pantalla-completa {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  color: var(--tenue);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radio-mando);
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+
+.pantalla-completa:hover {
+  color: var(--acento);
+  border-color: var(--acento);
+}
+
+@media (pointer: coarse) {
+  .pantalla-completa {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.pantalla-completa-flotante {
+  position: absolute;
+  top: max(0.75rem, env(safe-area-inset-top));
+  z-index: 3;
+  color: var(--palabra);
+  background: rgba(18, 22, 29, 0.72);
+  border-color: var(--filo);
+}
+
+.pantalla-completa-izquierda {
+  left: max(0.75rem, env(safe-area-inset-left));
+}
+
+.pantalla-completa-derecha {
+  right: max(0.75rem, env(safe-area-inset-right));
+}
+
+.pantalla-completa-flotante:hover {
+  border-color: var(--acento);
 }
 
 /* --- Riberas en tres dimensiones ----------------------------------------- */
@@ -2641,6 +2842,33 @@ code {
 }
 
 /*
+ * ═══ Y DONDE LA COLUMNA LLEGABA A LA MANO DE BIENES, SE RECOGE ═══
+ *
+ * La mano de bienes asoma por el canto derecho desde un tercio del alto del lienzo. La columna
+ * acababa en 10rem mirando la mesa (160 puntos) y en 13,25rem a pie, así que con el fotógrafo, el
+ * 27-sep, «A pie» caía encima de los naipes en 844×390 y 915×412 (empiezan a 127 y 134), y «Ojos»
+ * en 360×640 (empiezan a 210). Dos arreglos, y ninguno mueve nada en un monitor:
+ *
+ *   · A PIE, los dos mandos suben a los sitios de volver y recoger, que andando no están.
+ *   · TUMBADO Y BAJO, mirando la mesa, «A pie» se pone a la IZQUIERDA de recoger, en su misma fila:
+ *     la columna acaba en 6,75rem (108 puntos). Volver sigue arriba, a la derecha de la cinta.
+ */
+.riberas-camara.riberas-camara-a-pie {
+  top: 0.75rem;
+}
+
+.riberas-camara.riberas-camara-segunda.riberas-camara-a-pie {
+  top: 4rem;
+}
+
+@media (orientation: landscape) and (max-height: 540px) {
+  .riberas-camara:not(.riberas-camara-a-pie) {
+    top: 4rem;
+    right: calc(0.75rem + 2.75rem + 0.5rem);
+  }
+}
+
+/*
  * CÓMO SE ANDA, mientras se anda: abajo a la izquierda, que a pie es sitio libre —la barra se ha
  * recogido al bajar y la mano del mazo no baja del 30 % del alto—, con la placa de los mandos y
  * SIN COGER EL PUNTERO: es un cartel, no un control. Ver `ComoSeAndaPorElDelta`.
@@ -2913,6 +3141,26 @@ code {
 }
 
 /*
+ * ═══ DE PIE, LA FRASE EN DOS RENGLONES ═══
+ *
+ * De pie la cinta es el 40 % del ancho —las manos suben hasta arriba, `escenas/cinta.ts`— y en
+ * 360×640 a la frase le quedaban trece letras: «Te toca: tira lo…», «Turno de Bert…» (fotógrafo,
+ * 27-sep). Es la única línea de estado de la pantalla, y en los 44 puntos de la cinta caben dos
+ * renglones de letra de 12 con su interlínea: se parte en dos y sólo se corta el segundo.
+ */
+@media (orientation: portrait) {
+  .riberas-cinta-frase {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    white-space: normal;
+    font-size: 0.78rem;
+    line-height: 1.15;
+  }
+}
+
+/*
  * ═══ EL RELOJ DE LA CINTA: LO ÚNICO DE LOS CUATRO TROZOS QUE NO SE ENCOGE ═══
  *
  * Lo que evita está contado con números en `escenas/cinta.ts`: la línea de estado no decía
@@ -3139,6 +3387,37 @@ code {
 .riberas-carril-glifo {
   position: relative;
   z-index: 1;
+}
+
+/*
+ * ═══ EN LAS LISTAS CORTAS EL CUADRADO SE ESTIRA Y DICE LA PALABRA ═══
+ *
+ * «Tirar los dados», «Pasar el turno»: el rótulo del juego en vez de un «1» que en un teléfono no
+ * dice nada (fotógrafo, 27-sep, a pie en 360×640). Mismo alto y mismo suelo de toque; el ancho
+ * crece con la palabra y, si no cabe, el carril rueda como con los dieciocho. El ordinal va delante
+ * para el teclado y con el dedo se esconde: no hay tecla que pulsar.
+ */
+.riberas-carril-opcion.riberas-carril-con-palabra {
+  width: auto;
+  min-width: 2.75rem;
+  padding: 0 0.75rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.riberas-carril-con-palabra + .riberas-carril-con-palabra {
+  box-shadow: inset 1px 0 0 0 var(--filo);
+}
+
+.riberas-carril-atajo {
+  margin-right: 0.4rem;
+  color: var(--tenue);
+}
+
+@media (pointer: coarse) {
+  .riberas-carril-atajo {
+    display: none;
+  }
 }
 
 /*
@@ -4332,6 +4611,66 @@ code {
 }
 
 /*
+ * ═══ LA PISTA Y EL CANAL, EN DOS RENGLONES; Y EN UN TELÉFONO LA PISTA SE VA (27-sep-2026) ═══
+ *
+ * Ver `ComoSeAndaPorElBurgo`: con el dedo, lo que se toca ya se ve, y las tres líneas del cartel se
+ * quedaban un tercio de la pantalla de un móvil encima de la calle. La pista se lee seis segundos y se
+ * recoge (alto y opacidad a cero, sin que quede un hueco); el canal se queda. Sin canal se va el cartel
+ * entero, para no dejar una caja vacía. Quien pide menos movimiento la ve irse sin fundido.
+ */
+.burgo-como-se-anda-pista,
+.burgo-como-se-anda-canal {
+  display: block;
+}
+
+.burgo-como-se-anda-tactil .burgo-como-se-anda-pista {
+  overflow: hidden;
+  max-height: 6em;
+  animation: burgo-la-pista-se-va 0.6s ease-in 6s forwards;
+}
+
+.burgo-como-se-anda-tactil:not(:has(.burgo-como-se-anda-canal)) {
+  animation: burgo-la-pista-se-va 0.6s ease-in 6s forwards;
+}
+
+@keyframes burgo-la-pista-se-va {
+  /* La letra a cero también: sin ella la pista, invisible, seguía dando su ANCHO al cartel del canal. */
+  to {
+    max-height: 0;
+    font-size: 0;
+    line-height: 0;
+    opacity: 0;
+    padding: 0;
+    border-width: 0;
+    visibility: hidden;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .burgo-como-se-anda-tactil .burgo-como-se-anda-pista,
+  .burgo-como-se-anda-tactil:not(:has(.burgo-como-se-anda-canal)) {
+    animation-duration: 0.01s;
+  }
+}
+
+/*
+ * ═══ EN UNA PANTALLA BAJA Y APAISADA, EN LA MESA, LAS CÁMARAS VAN AL PIE (27-sep-2026) ═══
+ *
+ * Medido con el fotógrafo en un móvil tumbado (844 × 390): debajo de la cinta, las tres cámaras se
+ * quedaban la franja de arriba a la izquierda, que es justo donde cae la esquina de arriba del anillo, y
+ * con carril bajaban hasta los 148 puntos de 390. Abajo a la izquierda no estorban: la caja del Burgo
+ * va abajo a la DERECHA, y la esquina de abajo del anillo cae entre las dos. Sólo en la mesa: a pie ahí
+ * va la palanca (`.burgo-andando`). Pesa (0,3,0), así que gana al `top` de `.burgo-a-pie-con-carril`
+ * sin tocar el orden de esas dos reglas, que `verify:escritorio` mide.
+ */
+@media (max-height: 30rem) and (orientation: landscape) {
+  .burgo-en-tres:not(.burgo-andando) .burgo-a-pie {
+    top: auto;
+    bottom: 0.75rem;
+  }
+}
+
+/*
  * --- La tarjeta del final -------------------------------------------------
  *
  * Sale sola al acabar la partida, encima del anillo y con el velo de las cajas del lienzo. La
@@ -4386,6 +4725,47 @@ code {
 /* Un enlace con forma de opción: el subrayado del navegador sobraría dentro del botón. */
 .burgo-final-salir {
   text-decoration: none;
+}
+
+/*
+ * ═══ EN UNA PANTALLA BAJA, LA TARJETA DEL FINAL SE ENSANCHA Y SE APRIETA (27-sep-2026) ═══
+ *
+ * Medido con el fotógrafo en un móvil tumbado (844 × 390): con sus 26rem de ancho y un rem de aire
+ * entre cada cosa, la tarjeta medía más que la pantalla y «Ver el tablero» y «Volver a la Sala»
+ * quedaban debajo, a un desplazamiento que nadie sabe que tiene que hacer. Tumbado sobra ancho y falta
+ * alto: la tarjeta crece a lo ancho, el aire baja a medio renglón y las dos salidas van en fila. Pesa
+ * (0,2,0) para ganarle a `.lienzo-caja`, que va después en la hoja.
+ */
+@media (max-height: 30rem) {
+  /*
+   * `width` y no sólo `max-width`: la caja va con `left: 50%` y su ancho «a lo que pida» se para en la
+   * MITAD del lienzo, que es lo que la dejaba en 422 de 844 (medido con `getComputedStyle`).
+   */
+  .lienzo-caja.burgo-final {
+    width: min(calc(100% - 1.5rem), 44rem);
+    max-width: min(calc(100% - 1.5rem), 44rem);
+    gap: 0.4rem;
+    padding: 0.75rem 1rem;
+  }
+
+  .lienzo-caja.burgo-final .burgo-final-frase,
+  .lienzo-caja.burgo-final > p,
+  .lienzo-caja.burgo-final > .rotulo-de-panel {
+    margin: 0;
+  }
+
+  .lienzo-caja.burgo-final .burgo-final-frase {
+    font-size: 1rem;
+  }
+
+  .lienzo-caja.burgo-final .burgo-final-puestos {
+    margin: 0.25rem 0;
+  }
+
+  .lienzo-caja.burgo-final .opciones {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
 }
 
 /*
@@ -4725,6 +5105,35 @@ code {
  */
 .burgo-seccion-toca {
   box-shadow: 0 0 0 1px var(--acento);
+}
+
+/*
+ * ═══ EN EL CAJÓN, LAS SECCIONES PLEGADAS SON UN RENGLÓN (27-sep-2026) ═══
+ *
+ * Medido con el fotógrafo en un móvil de 360 × 640: cada sección plegada era un panel dentro del
+ * panel del cajón, con su relleno de 1rem + 1,25rem, el margen del rótulo y un botón del ancho de su
+ * palabra dentro: 110 puntos de alto para decir «Ahora ▸», y en un móvil tumbado cabían dos y media.
+ * Dentro del cajón el panel pierde la mitad del relleno, el rótulo su margen cuando lo que lleva es el
+ * botón de plegar, y el botón ocupa el ancho entero con el triángulo al otro lado: se toca en cualquier
+ * punto del renglón y la sección cerrada mide lo que el botón, 44 puntos y su aire.
+ */
+.burgo-cajon .burgo-seccion {
+  padding: 0.5rem 0.75rem;
+}
+
+.burgo-cajon .burgo-seccion > .rotulo-de-panel:has(> .opcion) {
+  margin: 0;
+}
+
+.burgo-cajon .burgo-seccion > .rotulo-de-panel > .opcion {
+  width: 100%;
+  min-width: 0;
+  justify-content: space-between;
+  border-color: transparent;
+}
+
+.burgo-cajon .burgo-seccion > .rotulo-de-panel > .opcion[aria-expanded='true'] {
+  margin-bottom: 0.5rem;
 }
 
 .burgo-renglon {
@@ -6044,6 +6453,226 @@ code {
 }
 
 /*
+ * ═══ UN TELÉFONO TUMBADO: EL RAÍL AL LADO, NO DEBAJO ═══
+ *
+ * Por debajo de 60rem el raíl se cuelga bajo el lienzo, y eso en un teléfono tumbado es un
+ * tablero en una tira: medido en 844×390 (27-sep-2026, `docs/PANTALLAS.md`), el lienzo se
+ * quedaba en 234 puntos de alto y la palanca de 128, con su margen, ocupaba más de la mitad;
+ * encima tapaba el cartel de cómo se anda. Tumbado lo que sobra es ANCHO, así que el raíl vuelve
+ * a su columna, más estrecha, y el lienzo se lleva el alto entero. La columna respeta la muesca
+ * de la derecha y la barra de gestos; la cinta, la de abajo.
+ */
+@media (max-width: 60rem) and (max-height: 30rem) and (orientation: landscape) {
+  .lindes-pantalla,
+  .sala:has(.lienzo-propio) .lindes-pantalla {
+    flex-direction: row;
+  }
+
+  .lindes-lienzo,
+  .sala:has(.lienzo-propio) .lindes-lienzo {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .lindes-rail {
+    flex: 0 0 clamp(14rem, 34vw, 19rem);
+    max-height: none;
+    padding: 0.5rem max(0.5rem, env(safe-area-inset-right)) max(0.5rem, env(safe-area-inset-bottom)) 0.5rem;
+    gap: 0.5rem;
+  }
+
+  .lindes-rail .lindes-mano,
+  .lindes-rail .lindes-plantar,
+  .lindes-rail .lindes-panel,
+  .lindes-rail .lindes-marcador {
+    padding: 0.5rem 0.6rem;
+  }
+
+  .lindes-cinta {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+  }
+
+  .lindes-lienzo .mandos-tactiles-sobre-la-cinta {
+    left: max(0.75rem, env(safe-area-inset-left));
+  }
+}
+
+/* A pie, los escudos van los primeros del raíl. Ver el `<aside>` de `lindes-en-tres.tsx`. */
+.lindes-rail-a-pie .lindes-escudos-panel {
+  order: -1;
+}
+
+/*
+ * ═══ CON EL DEDO, CADA BOTÓN DE 44 ═══
+ *
+ * «Girar», los renglones de «Dónde plantar» y las tres cámaras medían entre 30 y 36 puntos de
+ * alto: bien con ratón, pequeños para un pulgar (§4.3 de `docs/PANTALLAS.md`). Sólo con puntero
+ * grueso, para que en el ordenador el raíl no crezca.
+ */
+@media (pointer: coarse) {
+  .lindes-girar,
+  .lindes-plantar button,
+  .lindes-camara {
+    min-height: 2.75rem;
+  }
+
+  .lindes-camara {
+    min-width: 2.75rem;
+  }
+
+  /* Con alto de sobra, `baseline` dejaba el rótulo pegado arriba y medio botón vacío debajo. */
+  .lindes-plantar button {
+    align-items: center;
+  }
+
+  /* Las cámaras crecen a 44: el cartel de debajo baja con ellas para no quedarse pegado. */
+  .lindes-como-se-anda {
+    top: 3.8rem;
+  }
+}
+
+/*
+ * ═══ LA HOJA PLEGABLE: UN TELÉFONO DE PIE ═══
+ *
+ * La misma consulta que `CONSULTA_DE_LA_HOJA_PLEGABLE` en `lindes-en-tres.tsx`. De pie el raíl
+ * colgaba bajo el lienzo: el valle se quedaba en el 60 % del alto y la página se desplazaba por
+ * los paneles (27-sep-2026, `docs/PANTALLAS.md`). Aquí el valle se lleva la ventana entera y el
+ * raíl es una hoja que sube desde abajo, encima del valle, con su propio desplazamiento, hasta el
+ * 62 %: el tercio de arriba del valle sigue a la vista. Cerrada no ocupa nada; el asa «Paneles»
+ * va en la cinta, a la derecha, por debajo de la fila de «Correr». La tira de la jugada
+ * (`lindes-jugada`) va encima de la cinta, sólo en la mesa.
+ */
+.lindes-asa,
+.lindes-hoja-cabecera,
+.lindes-jugada {
+  display: none;
+}
+
+@media (max-width: 40rem) and (orientation: portrait) {
+  .lindes-pantalla,
+  .sala:has(.lienzo-propio) .lindes-pantalla {
+    position: relative;
+    flex-direction: column;
+  }
+
+  .lindes-lienzo,
+  .sala:has(.lienzo-propio) .lindes-lienzo {
+    flex: 1 1 auto;
+    height: auto;
+    min-height: 0;
+  }
+
+  .lindes-rail.lindes-rail-plegable {
+    display: none;
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 4;
+    max-height: 62%;
+    overflow: auto;
+    overscroll-behavior: contain;
+    padding: 0 0.6rem max(0.6rem, env(safe-area-inset-bottom));
+    gap: 0.5rem;
+    background: var(--suelo);
+    border-top: 1px solid var(--filo);
+    border-radius: var(--radio-ficha) var(--radio-ficha) 0 0;
+    box-shadow: 0 -0.5rem 1.5rem rgba(0, 0, 0, 0.45);
+  }
+
+  .lindes-rail.lindes-rail-plegable.lindes-rail-abierta {
+    display: flex;
+  }
+
+  /* A pie, «Correr» se quedaba a tres puntos del asa: un respiro entre los dos pulgares. */
+  .lindes-lienzo .mandos-tactiles-sobre-la-cinta {
+    bottom: 3.6rem;
+  }
+
+  /*
+   * La cabecera no se desplaza con la hoja: «Cerrar» se tiene siempre a mano. Y va la primera
+   * también a pie, por delante de los escudos (`order: -1`, `lindes-rail-a-pie`).
+   */
+  .lindes-hoja-cabecera {
+    order: -2;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+    padding: 0.4rem 0;
+    background: var(--suelo);
+    font-weight: 700;
+  }
+
+  .lindes-hoja-cerrar {
+    min-height: 2.75rem;
+    min-width: 5.5rem;
+  }
+
+  .lindes-asa {
+    display: block;
+    position: absolute;
+    right: 0.5rem;
+    bottom: max(0.15rem, env(safe-area-inset-bottom));
+    z-index: 2;
+    min-height: 2.75rem;
+    padding: 0.3rem 0.9rem;
+    font: inherit;
+    font-size: 0.9rem;
+    font-weight: 600;
+    border-radius: var(--radio-ficha);
+    border: 1px solid rgba(243, 236, 216, 0.45);
+    background: rgba(12, 20, 8, 0.72);
+    color: #f3ecd8;
+    cursor: pointer;
+  }
+
+  /* La frase de la cinta no se mete debajo del asa. */
+  .lindes-cinta {
+    padding-right: 7.5rem;
+    min-height: 3rem;
+    display: flex;
+    align-items: center;
+  }
+
+  .lindes-jugada {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4rem;
+    position: absolute;
+    left: 0.5rem;
+    right: 0.5rem;
+    bottom: 3.25rem;
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  .lindes-jugada-boton {
+    pointer-events: auto;
+    min-height: 2.75rem;
+    padding: 0.35rem 0.8rem;
+    font: inherit;
+    font-size: 0.9rem;
+    border-radius: var(--radio-ficha);
+    border: 1px solid rgba(243, 236, 216, 0.55);
+    background: rgba(12, 20, 8, 0.8);
+    color: #f3ecd8;
+    cursor: pointer;
+  }
+
+  .lindes-jugada-boton:disabled {
+    color: rgba(243, 236, 216, 0.7);
+    background: rgba(12, 20, 8, 0.55);
+    cursor: not-allowed;
+  }
+}
+
+/*
  * ═══ LOS MANDOS TÁCTILES DE LA SALA: la palanca, «Correr» y «Golpear» ═══
  *
  * Ver `mandos-tactiles.tsx`. Sólo existen a pie y en un aparato que se toca; en la mesa y con ratón
@@ -6189,6 +6818,29 @@ code {
  */
 .riberas-como-se-anda.riberas-como-se-anda-tactil {
   bottom: calc(0.75rem + 8rem + 0.5rem);
+  /* Un renglón, el del canal: las instrucciones se oyen y no se pintan (`ComoSeAndaPorElDelta`). */
+  max-width: calc(100% - 1.5rem);
+  padding: 0.35rem 0.6rem;
+}
+
+/* Con el dedo y sin canal no queda nada que pintar: ni placa ni filo, sólo la frase para un lector. */
+.riberas-como-se-anda.riberas-como-se-anda-muda {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+/* Las instrucciones con el dedo: en el árbol y fuera de la vista, como `.riberas-solo-apoyo`. */
+.riberas-como-se-anda-dicho {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /*

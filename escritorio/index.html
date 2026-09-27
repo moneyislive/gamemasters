@@ -15,6 +15,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <title>Sala de Arcade</title>
     <meta name="theme-color" content="#06110f" />
+    <!--
+      LA PANTALLA COMPLETA DONDE NO HAY API (`docs/PANTALLAS.md` §5). En el iPhone una página no
+      puede pedir la pantalla completa: la da añadirla a la pantalla de inicio, y para eso están el
+      manifiesto (`display: fullscreen`, orientación libre) y las metas de aplicación web de Apple,
+      con la barra de estado translúcida para que el tablero llegue hasta arriba —las zonas seguras
+      las respeta `estilo.css` con `env(safe-area-inset-*)`—. En Android el botón de las pantallas
+      de juego (`src/pantalla-completa.tsx`) hace lo mismo sin instalar nada.
+
+      Las rutas van desde la raíz y Vite les antepone la base (`/sala/`), en desarrollo y al
+      empaquetar: los ficheros de `public/` se sirven bajo ella, y el servidor los da con su tipo
+      (`express.static` conoce `.webmanifest`). Con `%BASE_URL%` saldría `/sala/sala/`.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/icono.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/icono-1024.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Sala" />
   </head>
   <body>
     <div id="raiz"></div>

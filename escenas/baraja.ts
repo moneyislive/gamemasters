@@ -138,7 +138,7 @@ export const DISTANCIA_DE_LA_BARAJA = 2;
  * cartas abiertas por el imán, el tablero desaparecía detrás. Una mano tiene que poder
  * consultarse SIN dejar de ver la partida, que es de lo que va consultarla.
  */
-const ALTO_DE_LA_CARTA = 0.15;
+export const ALTO_DE_LA_CARTA = 0.15;
 /** Y su proporción: más alta que ancha, como una carta de verdad. */
 const ANCHO_SOBRE_ALTO = 0.7;
 

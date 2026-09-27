@@ -700,10 +700,12 @@ export function Lindes(props: PropsDeLaEscenaDeLasLindes): JSX.Element {
           semilla={
             senalado === null ? semilla : semillaDeLaLosa(semilla, senalado.x, senalado.y)
           }
+          reservaAbajo={props.reservaAbajo ?? 0}
         />
       ) : null}
 
       <ElRelojDeLaBolsa
+        reservaAbajo={props.reservaAbajo ?? 0}
         aPie={camara.modo !== 'mesa'}
         catalogo={catalogo}
         traer={traer}
@@ -1012,9 +1014,12 @@ function ElRelojDeLaBolsa({
   deLaBolsa,
   sePuedePasar,
   alPasar,
+  reservaAbajo,
 }: {
   /** ¿Se está andando por el tablero? Entonces el rincón va cerca, o se entierra. */
   readonly aPie: boolean;
+  /** Los puntos de abajo que tapa la pantalla (la cinta, los mandos). Ver `PropsDeLasLindes`. */
+  readonly reservaAbajo: number;
   /** El pack, para la caja en la que se apoya. `null` mientras viaja. */
   readonly catalogo: Catalogo | null;
   /** Para traer `reloj.glb`. El mismo `traer` de la escena, así que se baja una sola vez. */
@@ -1058,6 +1063,7 @@ function ElRelojDeLaBolsa({
     size.width / Math.max(1, size.height),
     ALTO_DEL_RELOJ_EN_LADOS,
     aPie ? DISTANCIA_DE_LA_MANO_A_PIE : DISTANCIA_DE_LA_MANO,
+    reservaAbajo / Math.max(1, size.height),
   );
 
   /*
@@ -1180,9 +1186,12 @@ function LaLosaEnLaMano({
   losa,
   giro,
   semilla,
+  reservaAbajo,
 }: {
   /** ¿Se está andando por el tablero? Entonces el rincón va cerca, o se entierra. */
   readonly aPie: boolean;
+  /** Los puntos de abajo que tapa la pantalla (la cinta, los mandos). Ver `PropsDeLasLindes`. */
+  readonly reservaAbajo: number;
   readonly catalogo: Catalogo;
   readonly losa: string;
   readonly giro: Giro;
@@ -1223,6 +1232,7 @@ function LaLosaEnLaMano({
       camara.fov ?? 45,
       size.width / Math.max(1, size.height),
       aPie ? DISTANCIA_DE_LA_MANO_A_PIE : DISTANCIA_DE_LA_MANO,
+      reservaAbajo / Math.max(1, size.height),
     );
 
     AUX_ADELANTE.set(0, 0, -1).applyQuaternion(camara.quaternion);
