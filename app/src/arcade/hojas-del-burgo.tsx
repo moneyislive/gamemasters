@@ -1763,7 +1763,7 @@ const estilos = StyleSheet.create({
     borderColor: conAlfa(SALA.blanco, 0.4),
     backgroundColor: SALA.teja,
   },
-  carrilRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 12, lineHeight: 15, maxWidth: 104 },
+  carrilRotulo: { ...LETRA.rotuloChico, color: SALA.tenue, fontSize: 13, lineHeight: 16, maxWidth: 110 },
   carrilTira: { flexGrow: 0, flexShrink: 1 },
   carrilFila: { gap: 8, paddingVertical: 2, alignItems: 'flex-start' },
   cuadrado: {
